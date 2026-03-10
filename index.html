@@ -338,15 +338,24 @@
             return await fetchGemini(prompt);
         }
 
-        async function fetchGemini(prompt) {
+       async function fetchGemini(prompt) {
             const apiKey = getApiKey();
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            // 核心修改：使用 v1 正式版接口，并调用最新的 gemini-2.5-flash
+            const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+            
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
             });
-            if(!response.ok) throw new Error("API 请求失败");
+            
+            // 如果请求失败，把错误详细信息打印出来
+            if(!response.ok) {
+                const errData = await response.json();
+                console.error("Google API 报错详情:", errData);
+                alert("请求失败，请按 F12 打开控制台(Console)查看具体的红色报错信息。");
+                throw new Error("API 请求失败");
+            }
             
             const data = await response.json();
             const textResp = data.candidates[0].content.parts[0].text;
