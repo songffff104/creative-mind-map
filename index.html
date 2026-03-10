@@ -157,8 +157,8 @@
 
         /* 输入框 - 胶囊质感 */
         #bottom-toolbar {
-            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-            width: clamp(350px, 80%, 700px); display: flex; justify-content: center;
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: clamp(350px, 80%, 700px); display: flex; flex-direction: column; align-items: center; gap: 10px;
         }
         #input-wrapper-v3 { 
             border-radius: 50px; padding: 8px 10px 8px 25px; display: flex; align-items: center; width: 100%; 
@@ -174,6 +174,8 @@
             box-shadow: 0 4px 10px rgba(255, 179, 0, 0.3);
         }
         .input-icon-btn:hover { transform: scale(1.1) rotate(15deg); box-shadow: 0 6px 15px rgba(255, 179, 0, 0.5); }
+
+        .interaction-hint { font-size: 12px; color: #7f8c8d; font-weight: 500; text-shadow: 0 1px 2px rgba(255,255,255,0.8); }
 
         #status-indicator {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
@@ -285,6 +287,7 @@
                 <input type="text" id="main-input" placeholder="输入灵感火花，按回车发散..." autocomplete="off">
                 <button id="input-wand" class="input-icon-btn">✨</button>
             </div>
+            <div class="interaction-hint">提示: 拖拽父节点可移动整组，按住 Shift 拖拽可单移</div>
         </div>
     </div>
 
@@ -324,7 +327,7 @@
     </div>
 
     <script>
-        // 环境全局代理变量 (针对内部测试环境预留)
+        // 环境全局代理变量
         const envApiKey = typeof apiKey !== 'undefined' ? apiKey : "";
         
         // 莫兰迪/马卡龙高级色盘
@@ -333,14 +336,14 @@
         let nodes = []; let links = []; let collectedWords = new Set();
         let nodeIdCounter = 0; let currentScale = 1;
         
-        // 【核心状态】记录当前成功接通的模型
         let workingModel = null;
         
-        // 精确区分“拖拽”与“点击”
+        // 拖拽相关状态
         let isDragging = false; 
         let dragMoved = false; 
         let draggedNode = null; 
         let startX, startY;
+        let draggedGroupData = []; // 记录需要被联动拖拽的整个组的信息
 
         const container = document.getElementById('nodes-container');
         const zoomContainer = document.getElementById('zoom-container');
@@ -405,46 +408,75 @@
             zoomContainer.style.transform = `scale(${currentScale})`;
         }
 
-        // ================= 伪3D拖拽逻辑 (支持鼠标 & 触摸屏) =================
+        // ================= ★ 升级：组联动拖拽逻辑 =================
         function handleDragStart(e) {
             const nodeEl = e.target.closest('.mind-node');
             if (nodeEl) {
                 isDragging = true; 
                 dragMoved = false; 
                 draggedNode = nodeEl;
+                
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
                 startX = clientX; 
                 startY = clientY;
-                draggedNode.dataset.initX = parseFloat(draggedNode.style.left);
-                draggedNode.dataset.initY = parseFloat(draggedNode.style.top);
-                draggedNode.classList.add('dragging');
+
+                const nodeId = parseInt(nodeEl.id.split('-')[1], 10);
+                
+                // 判断是否按下了 Shift 或其他控制键进行“单飞模式”
+                const isSingleMove = e.shiftKey || e.ctrlKey || e.metaKey || e.altKey;
+
+                // 递归查找当前节点的所有“后代”节点（也就是它牵挂的整棵家族树）
+                const getDescendants = (id) => {
+                    let desc = [id];
+                    const children = links.filter(l => l.source === id).map(l => l.target);
+                    for (let child of children) {
+                        desc = desc.concat(getDescendants(child));
+                    }
+                    return desc;
+                };
+
+                const groupIds = isSingleMove ? [nodeId] : getDescendants(nodeId);
+
+                // 将要移动的整组节点存起来，并记录它们抓取时的初始坐标
+                draggedGroupData = groupIds.map(id => {
+                    const n = nodes.find(node => node.id === id);
+                    const dom = document.getElementById(`node-${id}`);
+                    if (dom) dom.classList.add('dragging');
+                    return { node: n, dom: dom, initX: n?.x, initY: n?.y };
+                }).filter(item => item.node && item.dom);
             }
         }
         
         function handleDragMove(e) {
-            if (!isDragging || !draggedNode) return;
+            if (!isDragging || draggedGroupData.length === 0) return;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
+            // 计算位移量
             const dx = (clientX - startX) / currentScale; 
             const dy = (clientY - startY) / currentScale;
             
             if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
 
-            const newX = parseFloat(draggedNode.dataset.initX) + dx; 
-            const newY = parseFloat(draggedNode.dataset.initY) + dy;
-            draggedNode.style.left = `${newX}px`; 
-            draggedNode.style.top = `${newY}px`;
+            // 批量将位移量应用给组内的每一个节点
+            draggedGroupData.forEach(item => {
+                const newX = item.initX + dx;
+                const newY = item.initY + dy;
+                item.node.x = newX;
+                item.node.y = newY;
+                item.dom.style.left = `${newX}px`;
+                item.dom.style.top = `${newY}px`;
+            });
             
-            const nodeObj = nodes.find(n => n.id === parseInt(draggedNode.id.split('-')[1], 10));
-            if(nodeObj) { nodeObj.x = newX; nodeObj.y = newY; }
             renderLinks();
         }
         
         function handleDragEnd() {
-            if (isDragging && draggedNode) { 
-                draggedNode.classList.remove('dragging'); 
+            if (isDragging) { 
+                // 清理所有拖动状态
+                draggedGroupData.forEach(item => item.dom.classList.remove('dragging'));
+                draggedGroupData = [];
                 draggedNode = null; 
                 isDragging = false; 
                 setTimeout(() => { dragMoved = false; }, 50);
@@ -473,7 +505,6 @@
                 document.getElementById('history-list').prepend(Object.assign(document.createElement('li'), {innerText: text}));
                 clearCanvas(); inputField.placeholder = "继续注入灵感...";
                 
-                // 给中心节点赋予随机基调颜色
                 const baseColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
                 const newNodeId = createNode(text, "...", window.innerWidth/2, window.innerHeight/2, true, baseColor, true);
                 renderNodes();
@@ -492,9 +523,11 @@
 
             showLoading("✨ 宇宙脑图织造中...", true);
             try {
-                const relatedWords = await callGeminiAPI(`你是一个思维发散引擎。请针对“${text}”发散出6个具象且有创意的关联词汇。返回严格JSON数组：[{"zh":"中文","en":"English"}]`, true);
+                // 修改为发散 8 个关联词
+                const relatedWords = await callGeminiAPI(`你是一个思维发散引擎。请针对“${text}”发散出8个具象且有创意的关联词汇。返回严格JSON数组：[{"zh":"中文","en":"English"}]`, true);
                 const parentNode = nodes.find(n => n.id === nodeId);
-                const radius = window.innerWidth < 768 ? 140 : 190; // 稍微扩大半径避免拥挤
+                // 增加一点扩展半径，为 8 个节点腾出空间
+                const radius = window.innerWidth < 768 ? 150 : 200; 
                 const angleStep = (2 * Math.PI) / relatedWords.length; let currentAngle = Math.random() * Math.PI; 
                 relatedWords.forEach((wordObj) => {
                     const childX = parentNode.x + radius * Math.cos(currentAngle); const childY = parentNode.y + radius * Math.sin(currentAngle);
@@ -606,7 +639,6 @@
                     container.appendChild(div);
                 }
                 
-                // 应用 CSS 变量来注入颜色，配合 CSS 实现 3D 渐变
                 div.style.setProperty('--node-color', node.color);
                 div.className = `mind-node ${node.isCentral ? 'central' : 'normal'}`;
                 
