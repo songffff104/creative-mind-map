@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创意发散器 V5.4 (智能双轨版)</title>
+    <title>创意发散器 V7 (全平台智能版)</title>
     <style>
         /* ================= 视觉与布局 ================= */
         :root {
@@ -104,6 +104,7 @@
         #overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7); backdrop-filter: blur(5px); z-index: 150; pointer-events: auto; }
         .panel { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 25px; border-radius: 16px; z-index: 200; width: 300px; text-align: center; pointer-events: auto; }
         
+        #settings-modal { width: 320px; }
         #history-panel { top: 70px; right: 70px; left: auto; transform: none; width: 200px; max-height: 300px; overflow-y: auto; text-align: left; }
         #collection-panel { top: 120px; right: 20px; left: auto; transform: none; width: 240px; max-height: 400px; overflow-y: auto; text-align: left; }
         
@@ -132,7 +133,7 @@
         <div id="nodes-container"></div>
     </div>
 
-    <!-- UI 交互区 (防遮挡设计) -->
+    <!-- UI 交互区 -->
     <div id="ui-layer">
         <div id="status-indicator" class="pointer-auto">星系运转中...</div>
         
@@ -157,11 +158,12 @@
     <!-- 弹窗遮罩与面板 -->
     <div id="overlay"></div>
     
+    <!-- 设置面板重磅回归 -->
     <div id="settings-modal" class="glass panel">
         <h3 style="margin-top:0;">配置 Gemini API Key</h3>
-        <p style="font-size:12px; color:#888;">如果在此页面预览，请保持输入框为空</p>
-        <input type="password" id="api-key-input" placeholder="部署到其他平台时填写私人 Key">
-        <button class="primary-btn" onclick="saveApiKey()">保存并关闭</button>
+        <p style="font-size:12px; color:#888;">如果你在自己的网站上运行，请务必填写私人 Key</p>
+        <input type="password" id="api-key-input" placeholder="粘贴您的私人 API Key...">
+        <button class="primary-btn" onclick="saveApiKey()">保存并开始</button>
     </div>
 
     <div id="history-panel" class="glass panel">
@@ -187,6 +189,9 @@
     </div>
 
     <script>
+        // 【核心】这个变量在当前预览环境下会自动注入，在你的 GitHub 网站上则为空
+        const apiKey = "";
+        
         const colorPalette = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#BDE0FE', '#A2D2FF', '#FFE5D9'];
 
         let nodes = []; let links = []; let collectedWords = new Set();
@@ -199,21 +204,24 @@
         const statusIndicator = document.getElementById('status-indicator');
         const overlay = document.getElementById('overlay');
 
-        // ================= API Key =================
+        // ================= API Key 智能管理 =================
         document.getElementById('settings-btn').onclick = () => {
             document.getElementById('api-key-input').value = localStorage.getItem('gemini_api_key') || '';
-            document.getElementById('settings-modal').style.display = 'block'; overlay.style.display = 'block';
+            document.getElementById('settings-modal').style.display = 'block'; 
+            overlay.style.display = 'block';
         };
         
         function saveApiKey() {
             const key = document.getElementById('api-key-input').value.trim();
-            if(key) { 
-                localStorage.setItem('gemini_api_key', key); 
-            } else {
-                localStorage.removeItem('gemini_api_key'); // 清空输入框即删除记录
-            }
+            if(key) { localStorage.setItem('gemini_api_key', key); } 
+            else { localStorage.removeItem('gemini_api_key'); }
             document.getElementById('settings-modal').style.display = 'none'; 
             overlay.style.display = 'none'; 
+        }
+
+        function getApiKey() { 
+            // 如果环境注入了 Key 就用环境的，否则读取你存在本地的私人 Key
+            return apiKey || localStorage.getItem('gemini_api_key') || ""; 
         }
 
         // ================= 面板与缩放 =================
@@ -264,6 +272,12 @@
 
         async function trigger发散() {
             if (inputField.value.trim() !== '') {
+                // 如果是在你的网站上运行，且没填 Key，直接弹出设置
+                if(!getApiKey()) { 
+                    document.getElementById('settings-btn').click(); 
+                    return; 
+                }
+
                 const text = inputField.value.trim(); inputField.value = ''; 
                 document.getElementById('history-list').prepend(Object.assign(document.createElement('li'), {innerText: text}));
                 clearCanvas(); inputField.placeholder = "+ 继续输入新的起点...";
@@ -277,6 +291,7 @@
         }
 
         async function onNodeClick(nodeId, text) {
+            if(!getApiKey()) { document.getElementById('settings-btn').click(); return; }
             showLoading("思维发散中...", true);
             try {
                 const relatedWords = await callGeminiAPI(`你是一个思维发散引擎。请针对“${text}”发散出6个具象且有创意的关联词汇。返回严格JSON数组：[{"zh":"中文","en":"English"}]`, true);
@@ -289,10 +304,14 @@
                     createLink(nodeId, childId); currentAngle += angleStep;
                 });
                 renderLinks(); renderNodes();
-            } catch (error) { console.error(error); alert("网络请求失败，请稍后重试！"); } finally { showLoading("", false); }
+            } catch (error) { 
+                console.error(error); 
+            } finally { 
+                showLoading("", false); 
+            }
         }
 
-        // ================= UI 与 收集逻辑修复 =================
+        // ================= UI 与 收集逻辑 =================
         function updateCollectionUI() {
             document.getElementById('collection-badge').innerText = collectedWords.size;
             const list = document.getElementById('collection-list');
@@ -319,6 +338,7 @@
         // ================= 一键生成文档 =================
         document.getElementById('generate-doc-btn').onclick = async () => {
             if (collectedWords.size === 0) { alert("请先右键高亮一些灵感词汇！"); return; }
+            if (!getApiKey()) { document.getElementById('settings-btn').click(); return; }
             document.getElementById('collection-panel').style.display = 'none';
             showLoading("正在为您编织创意企划，请稍候...", true); overlay.style.display = 'block';
 
@@ -326,7 +346,7 @@
             try {
                 document.getElementById('doc-content').innerText = await callGeminiAPI(prompt, false);
                 document.getElementById('document-modal').style.display = 'flex';
-            } catch (err) { alert("生成失败，请检查网络。"); overlay.style.display = 'none'; } finally { showLoading("", false); }
+            } catch (err) { alert("生成失败，请刷新页面重试。"); overlay.style.display = 'none'; } finally { showLoading("", false); }
         };
 
         function closeDocumentModal() { document.getElementById('document-modal').style.display = 'none'; overlay.style.display = 'none'; }
@@ -342,7 +362,7 @@
             }
         }
 
-        // ================= 渲染与 API =================
+        // ================= 渲染与逻辑 =================
         function createNode(zhText, enText, x, y, isLarge, color, isCentral) {
             const id = nodeIdCounter++; nodes.push({ id, zh: zhText, en: enText, x, y, isLarge, color, isCentral }); return id;
         }
@@ -391,44 +411,61 @@
             });
         }
 
+        // ================= 智能双轨 API 引擎 =================
         async function callGeminiAPI(prompt, expectJson) {
-            // 【核心逻辑】：根据你是否填写了私人 Key 进行智能分流
-            const userKey = localStorage.getItem('gemini_api_key') || "";
-            // 如果你填了私人 Key（比如部署在你的网站上），就用标准 1.5-flash
-            // 如果你留空了（在当前面板测试），就强制用系统允许的预览专属通道
-            const modelName = userKey ? 'gemini-1.5-flash' : 'gemini-2.5-flash-preview-09-2025';
+            const key = getApiKey();
+            if (!key) throw new Error("API Key is missing");
+
+            // 智能判定：如果有系统环境变量(apiKey)，就在右侧面板使用限定模型；
+            // 如果是你的私人 Key，就使用最稳定的 1.5-flash
+            let modelName = apiKey ? "gemini-2.5-flash-preview-09-2025" : "gemini-1.5-flash";
+            let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
             
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${userKey}`;
             const payload = { contents: [{ parts: [{ text: prompt }] }] };
-            const delays = [1000, 2000, 4000, 8000, 16000]; // 指数退避重试策略
             
-            for (let i = 0; i <= delays.length; i++) {
+            let response = await fetch(url, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(payload)
+            });
+
+            // 【终极降级保护】：如果你的私人账号报错 404 (不支持 1.5-flash)，后台静默降级到老版的 gemini-pro
+            if (response.status === 404 && !apiKey) {
+                console.warn("1.5-flash 请求失败，正在自动降级尝试 gemini-pro...");
+                modelName = "gemini-pro";
+                url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
+                response = await fetch(url, {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify(payload)
+                });
+            }
+
+            if (!response.ok) {
+                // 如果出现 401 报错（说明 Key 填错了）弹出设置面板
+                if (response.status === 401 || response.status === 403) {
+                    document.getElementById('settings-btn').click();
+                    alert("检测到 API Key 无效或未授权，请检查后重新填写！");
+                }
+                const errorData = await response.json().catch(()=>({}));
+                throw new Error(`API failed: ${response.status} ${errorData.error?.message || ''}`);
+            }
+            
+            const data = await response.json();
+            const textResp = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            
+            if (expectJson) {
+                const fence = String.fromCharCode(96, 96, 96); 
+                const cleanText = textResp.replace(new RegExp(fence + 'json', 'gi'), '').replace(new RegExp(fence, 'g'), '').trim();
                 try {
-                    const response = await fetch(url, {
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify(payload)
-                    });
-                    
-                    if (!response.ok) {
-                        const errorData = await response.json().catch(()=>({}));
-                        throw new Error(`API failed: ${response.status} ${errorData.error?.message || ''}`);
-                    }
-                    
-                    const data = await response.json();
-                    const textResp = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                    
-                    if (expectJson) {
-                        const fence = String.fromCharCode(96, 96, 96); 
-                        const cleanText = textResp.replace(new RegExp(fence + 'json', 'g'), '').replace(new RegExp(fence, 'g'), '').trim();
-                        return JSON.parse(cleanText);
-                    }
-                    return textResp;
-                } catch (err) {
-                    if (i === delays.length) throw err; // 所有重试失败后抛出异常
-                    await new Promise(r => setTimeout(r, delays[i]));
+                    return JSON.parse(cleanText);
+                } catch (parseError) {
+                    const match = textResp.match(/\[[\s\S]*\]/) || textResp.match(/\{[\s\S]*\}/);
+                    if (match) return JSON.parse(match[0]);
+                    throw parseError; 
                 }
             }
+            return textResp;
         }
     </script>
 </body>
