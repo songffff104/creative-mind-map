@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创意发散器 V3</title>
+    <title>创意发散器 V4 (灵感结晶版)</title>
     <style>
-        /* ================= 视觉风格 ================= */
+        /* ================= 视觉风格 V4 ================= */
         :root {
             --bg-color: #ffffff;
-            --node-black: #1a1a1a;
+            --text-dark: #333333;
+            --line-gray: #d0d0d0;
             --accent-yellow: #FFD700;
-            --glass-bg: rgba(26, 26, 26, 0.6);
+            --node-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            --glass-bg: rgba(255, 255, 255, 0.4);
             --glass-border: rgba(255, 255, 255, 0.1);
         }
 
@@ -18,157 +20,122 @@
             margin: 0; padding: 0; width: 100vw; height: 100vh;
             background-color: var(--bg-color);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden;
+            overflow: hidden; user-select: none;
         }
 
         .glass {
             background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1); color: white;
+            border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05); color: var(--text-dark);
         }
 
-        #history-panel {
-            position: absolute; top: 20px; right: 20px; width: 200px; max-height: 300px;
-            border-radius: 16px; padding: 15px; overflow-y: auto; z-index: 100;
+        #graph-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
+            transform-origin: 0 0; cursor: grab;
         }
-        #history-panel h3 { margin: 0 0 10px 0; font-size: 14px; color: var(--accent-yellow); }
-        #history-list { list-style: none; padding: 0; margin: 0; font-size: 12px; }
-        #history-list li { margin-bottom: 5px; opacity: 0.8; }
+        #graph-container.dragging { cursor: grabbing; }
 
-        #settings-btn {
-            position: absolute; top: 20px; left: 20px; padding: 10px 15px; border-radius: 12px;
-            cursor: pointer; z-index: 100; font-size: 14px; border: none; font-weight: bold;
-            background: var(--node-black); color: white; transition: 0.3s;
-        }
-        #settings-btn:hover { background: var(--accent-yellow); color: var(--node-black); }
-        
-        #settings-modal {
-            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 300px; padding: 20px; border-radius: 16px; z-index: 200; text-align: center;
-        }
-        #settings-modal input {
-            width: 90%; padding: 10px; margin: 15px 0; border-radius: 8px; border: none; outline: none;
-        }
-        #settings-modal button {
-            padding: 8px 20px; border-radius: 8px; border: none; cursor: pointer;
-            background: var(--accent-yellow); color: var(--node-black); font-weight: bold;
-        }
-        #overlay {
-            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.7); backdrop-filter: blur(5px); z-index: 150;
-        }
+        #canvas-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;}
+        .mind-edge { stroke: var(--line-gray); stroke-width: 1.5; transition: stroke 0.3s; }
 
-        #input-wrapper {
-            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-            border-radius: 50px; padding: 5px 20px; display: flex; align-items: center; z-index: 100;
-        }
-        #main-input {
-            background: transparent; border: none; color: white; font-size: 16px; outline: none; width: 300px; padding: 10px;
-        }
-        #main-input::placeholder { color: rgba(255,255,255,0.6); }
-
-        #canvas-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        .line { stroke: #d0d0d0; stroke-width: 2; transition: stroke 0.3s; }
-
-        #nodes-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
-        .node {
-            position: absolute; color: white; border-radius: 50%; display: flex; flex-direction: column;
+        #nodes-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
+        .mind-node {
+            position: absolute; background-color: var(--bg-color); color: var(--text-dark); border-radius: 50%; display: flex; flex-direction: column;
             justify-content: center; align-items: center; transform: translate(-50%, -50%);
-            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.15); transition: all 0.3s ease;
+            cursor: pointer; box-shadow: var(--node-shadow); transition: all 0.3s ease, transform 0s, left 0s, top 0s;
             text-align: center; padding: 10px; word-wrap: break-word;
         }
-        .node:hover { transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 8px 25px rgba(0,0,0,0.2); }
+        .mind-node:hover { transform: translate(-50%, -50%) scale(1.03); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+        .mind-node.dragging { cursor: grabbing; box-shadow: 0 12px 35px rgba(0,0,0,0.2); }
+        
         .node-zh { font-weight: bold; font-size: 14px; line-height: 1.2; }
         .node-en { font-size: 10px; opacity: 0.85; margin-top: 4px; line-height: 1.1; }
 
-        .node.normal { width: 80px; height: 80px; }
-        .node.large { width: 110px; height: 110px; }
-        .node.large .node-zh { font-size: 18px; }
-        .node.large .node-en { font-size: 12px; }
-        .node.selected { border: 4px solid var(--accent-yellow); transform: translate(-50%, -50%) scale(1.1); }
+        .mind-node.central { width: 110px; height: 110px; font-size: 18px; }
+        .mind-node.central .node-zh { font-size: 18px; }
+        .mind-node.central .node-en { font-size: 12px; }
+        .mind-node.normal { width: 80px; height: 80px; }
+        .mind-node.expanded { border: 3px solid var(--text-dark); box-shadow: 0 0 15px rgba(0,0,0,0.2); }
+        
+        /* 收集状态：明黄高亮 */
+        .mind-node.collected { 
+            background-color: var(--accent-yellow) !important; color: var(--text-dark) !important; 
+            border: none !important; box-shadow: 0 0 20px rgba(255, 215, 0, 0.6) !important; 
+        }
 
-        #loading-indicator {
-            position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
-            color: var(--node-black); font-size: 14px; font-weight: bold; display: none; z-index: 100;
+        /* ================= 界面控件 ================= */
+        #bottom-toolbar {
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            width: clamp(350px, 80%, 700px); display: flex; justify-content: space-between; align-items: center; z-index: 100;
+        }
+        #input-wrapper-v3 {
+            border-radius: 50px; padding: 5px 20px; display: flex; align-items: center; flex: 1; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        #input-plus { color: #888; font-size: 20px; margin-right: 15px; }
+        #main-input { background: transparent; border: none; color: var(--text-dark); font-size: 16px; outline: none; flex: 1; padding: 10px; }
+        #main-input::placeholder { color: #888; }
+        #input-buttons { display: flex; gap: 10px; }
+        .input-icon-btn {
+            background: var(--accent-yellow); color: var(--text-dark); border: none; border-radius: 50%; 
+            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; font-size: 18px;
+        }
+        .input-icon-btn:hover { transform: scale(1.1); }
+        .input-icon-btn.secondary { background: var(--bg-color); box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #888; }
+        .input-icon-btn.secondary:hover { color: var(--text-dark); background: var(--bg-color); }
+
+        .glass-btn {
+            background: var(--glass-bg); backdrop-filter: blur(8px); border: 1px solid var(--glass-border);
+            color: #888; box-shadow: 0 2px 8px rgba(0,0,0,0.05); transition: 0.3s;
+            width: 40px; height: 40px; border-radius: 12px; cursor: pointer; z-index: 100; font-size: 18px; border: none; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; position: absolute;
+        }
+        .glass-btn:hover { color: var(--text-dark); background: rgba(255, 255, 255, 0.6); }
+
+        #settings-btn { top: 20px; left: 20px; }
+        #history-btn { top: 20px; right: 20px; }
+        
+        /* 收集箱按钮 */
+        #collection-btn { top: 70px; right: 20px; position: absolute; width: auto; padding: 0 15px; gap: 5px; }
+        #collection-badge { background: var(--accent-yellow); color: var(--text-dark); border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+
+        #scale-control { position: absolute; bottom: 40px; left: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 100; }
+        .scale-btn { position: relative; top: 0; left: 0; }
+
+        #status-indicator {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            padding: 8px 15px; border-radius: 50px; font-size: 12px; font-weight: bold; display: none; z-index: 100;
+            background: var(--accent-yellow); color: var(--text-dark);
             animation: breathe 1.5s infinite ease-in-out alternate;
         }
-        @keyframes breathe { 0% { opacity: 0.3; } 100% { opacity: 1; } }
+        @keyframes breathe { 0% { opacity: 0.5; } 100% { opacity: 1; } }
 
-    </style>
-</head>
-<body>
-
-    <svg id="canvas-svg"></svg>
-    <div id="nodes-container"></div>
-
-    <button id="settings-btn">⚙️ 设置 API Key</button>
-    <div id="overlay"></div>
-    <div id="settings-modal" class="glass">
-        <h3 style="margin-top:0;">配置 Gemini API Key</h3>
-        <p style="font-size:12px; opacity:0.8; margin-bottom:5px;">Key 会保存在本地</p>
-        <input type="password" id="api-key-input" placeholder="粘贴你的 API Key 到这里...">
-        <button onclick="saveApiKey()">保存并关闭</button>
-    </div>
-
-    <div id="history-panel" class="glass">
-        <h3>历史记录</h3>
-        <ul id="history-list"></ul>
-    </div>
-
-    <div id="input-wrapper" class="glass">
-        <input type="text" id="main-input" placeholder="输入灵感 (回车确认)..." autocomplete="off">
-    </div>
-
-    <div id="loading-indicator">正在与 Gemini 连接思维...</div>
-
-    <script>
-        const colorPalette = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#D4A5A5', 
-            '#9B59B6', '#3498DB', '#E67E22', '#2ECC71', '#F39C12',
-            '#1abc9c', '#e74c3c', '#8e44ad', '#2c3e50', '#d35400'
-        ];
-
-        let nodes = [];
-        let links = [];
-        let selectedNodeId = null;
-        let nodeIdCounter = 0;
-
-        const container = document.getElementById('nodes-container');
-        const svgCanvas = document.getElementById('canvas-svg');
-        const inputField = document.getElementById('main-input');
-        const historyList = document.getElementById('history-list');
-        const loadingIndicator = document.getElementById('loading-indicator');
-
-        // ================= API Key 管理 =================
-        const settingsBtn = document.getElementById('settings-btn');
-        const settingsModal = document.getElementById('settings-modal');
-        const overlay = document.getElementById('overlay');
-        const apiKeyInput = document.getElementById('api-key-input');
-
-        settingsBtn.onclick = () => {
-            apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
-            settingsModal.style.display = 'block'; overlay.style.display = 'block';
-        };
-
-        function saveApiKey() {
-            const key = apiKeyInput.value.trim();
-            if(key) {
-                localStorage.setItem('gemini_api_key', key);
-                settingsModal.style.display = 'none'; overlay.style.display = 'none';
-            } else { alert("API Key 不能为空"); }
+        /* 面板通用 */
+        .panel {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            padding: 20px; border-radius: 16px; z-index: 200;
         }
+        #settings-modal, #history-panel, #collection-panel { width: 300px; text-align: center; }
+        #settings-modal input { width: 90%; padding: 10px; margin: 15px 0; border-radius: 8px; border: none; outline: none; }
+        .primary-btn {
+            padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; width: 100%;
+            background: var(--accent-yellow); color: var(--text-dark); font-weight: bold; font-size: 14px; transition: 0.3s;
+        }
+        .primary-btn:hover { box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4); transform: translateY(-2px); }
 
-        function getApiKey() { return localStorage.getItem('gemini_api_key'); }
+        /* 历史与收集箱位置修正 */
+        #history-panel { top: 70px; right: 70px; left: auto; transform: none; width: 200px; max-height: 300px; overflow-y: auto; text-align: left; }
+        #collection-panel { top: 120px; right: 20px; left: auto; transform: none; width: 220px; max-height: 400px; overflow-y: auto; text-align: left; }
+        
+        .panel h3 { margin: 0 0 10px 0; font-size: 14px; color: #888; }
+        .list-container { list-style: none; padding: 0; margin: 0; font-size: 13px; margin-bottom: 15px; }
+        .list-container li { margin-bottom: 8px; padding: 5px 8px; background: rgba(0,0,0,0.03); border-radius: 6px; display: inline-block; margin-right: 5px; border: 1px solid rgba(0,0,0,0.05);}
 
-        // ================= 核心交互 =================
-        inputField.addEventListener('keypress', async (e) => {
-            if (e.key === 'Enter' && inputField.value.trim() !== '') {
-                if(!getApiKey()) {
-                    alert("请先点击左上角设置 API Key！"); settingsBtn.click(); return;
-                }
-                const text = inputField.value.trim();
-                inputField.value = ''; 
-                await handleNewInput(text);
-            }
-        });
-
-        async function handleNewInput(
+        /* 最终文档展示大面板 */
+        #document-modal {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: clamp(300px, 80%, 700px); max-height: 80vh; padding: 30px; border-radius: 20px; z-index: 300;
+            display: flex; flex-direction: column; gap: 15px; background: var(--bg-color); border: 1px solid var(--line-gray);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+        }
+        #doc-content {
+            flex: 1; overflow-y: auto; font-size: 15px; line-height: 1.6; color: var(--text-dark);
+            white-space: pre-wrap; padding: 10px; background: rgba(0,0,0,0.02
