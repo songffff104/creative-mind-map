@@ -3,137 +3,261 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创意发散器 (自动探测模型版)</title>
+    <title>创意发散器 V10 (极致视觉版)</title>
     <style>
-        /* ================= 视觉与布局 ================= */
+        /* ================= 视觉与动态背景 ================= */
         :root {
-            --bg-color: #ffffff;
-            --text-dark: #333333;
-            --line-gray: #d0d0d0;
+            --text-dark: #2C3E50;
+            --line-gray: rgba(166, 180, 200, 0.6);
             --accent-yellow: #FFD700;
-            --node-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            --glass-bg: rgba(255, 255, 255, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.2);
+            --glass-bg: rgba(255, 255, 255, 0.45);
+            --glass-border-light: rgba(255, 255, 255, 0.8);
+            --glass-border-dark: rgba(255, 255, 255, 0.3);
+            --shadow-subtle: 0 8px 32px rgba(31, 38, 135, 0.08);
         }
 
         body, html {
             margin: 0; padding: 0; width: 100vw; height: 100vh;
-            background-color: var(--bg-color);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f9;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             overflow: hidden; user-select: none;
         }
 
-        .glass {
-            background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05); color: var(--text-dark);
+        /* 氛围流光背景 */
+        .ambient-bg {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; overflow: hidden; pointer-events: none;
+        }
+        .blob {
+            position: absolute; filter: blur(90px); opacity: 0.6; border-radius: 50%;
+            animation: float 12s infinite alternate ease-in-out;
+        }
+        .blob1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: #FFD1FF; }
+        .blob2 { bottom: -20%; right: -10%; width: 60vw; height: 60vw; background: #D1FFFF; animation-delay: -4s; }
+        .blob3 { top: 30%; left: 30%; width: 40vw; height: 40vw; background: #FFF0D1; animation-duration: 18s; }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(10%, 15%) scale(1.1); }
         }
 
-        /* 统一缩放容器 */
-        #zoom-container {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; transform-origin: 0 0;
+        /* 苹果级毛玻璃通用类 */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border-dark);
+            border-top: 1px solid var(--glass-border-light);
+            border-left: 1px solid var(--glass-border-light);
+            box-shadow: var(--shadow-subtle);
+            color: var(--text-dark);
         }
-        
+
+        /* ================= 画布与连线 ================= */
+        #zoom-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; transform-origin: 0 0; }
         #canvas-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;}
-        .mind-edge { stroke: var(--line-gray); stroke-width: 1.5; transition: stroke 0.3s; }
+        
+        .mind-edge { 
+            stroke: var(--line-gray); stroke-width: 2.5; stroke-linecap: round;
+            transition: stroke 0.3s; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));
+        }
 
         #nodes-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
         
+        /* ================= 伪 3D 质感节点 (核心UI升级) ================= */
         .mind-node {
             position: absolute; border-radius: 50%; display: flex; flex-direction: column;
             justify-content: center; align-items: center; transform: translate(-50%, -50%);
-            cursor: grab; box-shadow: var(--node-shadow); transition: transform 0.2s, box-shadow 0.2s;
-            text-align: center; padding: 10px; word-wrap: break-word; background-color: #fff;
+            cursor: grab; text-align: center; padding: 10px; word-wrap: break-word;
+            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Q弹动画 */
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
-        .mind-node:hover { transform: translate(-50%, -50%) scale(1.05); }
-        .mind-node.dragging { cursor: grabbing; box-shadow: 0 12px 35px rgba(0,0,0,0.2); transform: translate(-50%, -50%) scale(1.05); z-index: 10;}
-        
-        .node-zh { font-weight: bold; font-size: 14px; line-height: 1.2; pointer-events: none; }
-        .node-en { font-size: 10px; opacity: 0.85; margin-top: 4px; line-height: 1.1; pointer-events: none; }
 
-        .mind-node.central { width: 110px; height: 110px; font-size: 18px; color: #fff; border: none; }
-        .mind-node.normal { width: 80px; height: 80px; color: var(--text-dark); }
+        @keyframes popIn {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* 普通节点：新拟态微凸起质感 */
+        .mind-node.normal { 
+            width: 84px; height: 84px; color: var(--text-dark);
+            background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(240,245,250,0.85));
+            border: 2px solid var(--node-color);
+            box-shadow: 
+                6px 6px 14px rgba(166,180,200,0.3),    /* 右下底阴影 */
+                -6px -6px 14px rgba(255,255,255,0.9),  /* 左上环境光 */
+                inset 1px 1px 2px rgba(255,255,255,1), /* 左上内高光 */
+                inset -1px -1px 2px rgba(0,0,0,0.03);  /* 右下内暗角 */
+        }
+
+        /* 中心节点：深色能量核质感 */
+        .mind-node.central { 
+            width: 114px; height: 114px; font-size: 18px; color: #fff;
+            background: linear-gradient(135deg, var(--node-color), #2C3E50);
+            border: 2px solid rgba(255,255,255,0.4);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            box-shadow: 
+                0 10px 25px rgba(0,0,0,0.2), 
+                inset 2px 2px 6px rgba(255,255,255,0.4),
+                inset -2px -2px 6px rgba(0,0,0,0.2);
+        }
+
+        /* 悬浮反馈：3D抬升 */
+        .mind-node:hover { 
+            transform: translate(-50%, -55%) scale(1.08); 
+            box-shadow: 
+                10px 15px 20px rgba(166,180,200,0.4),
+                -8px -8px 16px rgba(255,255,255,0.9),
+                inset 1px 1px 2px rgba(255,255,255,1);
+            z-index: 10;
+        }
         
-        /* 收集状态：明黄高亮 */
+        .mind-node.dragging { 
+            cursor: grabbing; transform: translate(-50%, -50%) scale(1.1); z-index: 20;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        
+        .node-zh { font-weight: 700; font-size: 15px; line-height: 1.2; pointer-events: none; }
+        .node-en { font-size: 10px; opacity: 0.7; margin-top: 4px; line-height: 1.1; pointer-events: none; font-family: monospace; }
+
+        /* 收集状态：纯金 3D 勋章质感 */
         .mind-node.collected { 
-            background-color: var(--accent-yellow) !important; color: var(--text-dark) !important; 
-            border: 3px solid #fff !important; box-shadow: 0 0 20px rgba(255, 215, 0, 0.6) !important; 
+            background: linear-gradient(135deg, #FFE066, #FF9900) !important; 
+            color: #5D4000 !important; 
+            border: 2px solid #FFF59D !important; 
+            box-shadow: 
+                0 8px 25px rgba(255, 153, 0, 0.5),
+                inset 2px 2px 5px rgba(255,255,255,0.9),
+                inset -2px -2px 5px rgba(160, 80, 0, 0.4) !important; 
+            text-shadow: 0 1px 1px rgba(255,255,255,0.6);
         }
 
-        /* ================= UI 悬浮层 ================= */
+        /* ================= UI 悬浮层控件 ================= */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; }
         .pointer-auto { pointer-events: auto; }
 
         .glass-btn {
-            background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-dark);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05); transition: 0.3s;
-            width: 40px; height: 40px; border-radius: 12px; cursor: pointer; font-size: 18px; font-weight: bold;
+            width: 44px; height: 44px; border-radius: 14px; cursor: pointer; font-size: 18px; font-weight: bold;
             display: flex; align-items: center; justify-content: center; position: absolute;
+            transition: all 0.3s ease;
         }
-        .glass-btn:hover { background: rgba(255,255,255,0.9); transform: translateY(-2px); }
+        .glass-btn:hover { background: rgba(255,255,255,0.8); transform: translateY(-3px) scale(1.05); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .glass-btn:active { transform: translateY(1px) scale(0.95); }
         
         #settings-btn { top: 20px; left: 20px; }
         #history-btn { top: 20px; right: 20px; }
-        #collection-btn { top: 70px; right: 20px; width: auto; padding: 0 15px; gap: 8px; }
-        #collection-badge { background: var(--accent-yellow); color: var(--text-dark); border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold;}
+        #collection-btn { top: 80px; right: 20px; width: auto; padding: 0 18px; gap: 8px; font-size: 15px;}
+        #collection-badge { 
+            background: linear-gradient(135deg, #FFD700, #FF8C00); color: #fff; 
+            border-radius: 50%; width: 22px; height: 22px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold;
+            box-shadow: 0 2px 5px rgba(255, 140, 0, 0.4);
+        }
 
-        #scale-control { position: absolute; bottom: 40px; left: 20px; display: flex; flex-direction: column; gap: 10px; }
-        .scale-btn { position: relative; top: 0; left: 0; }
+        #scale-control { position: absolute; bottom: 40px; left: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .scale-btn { position: relative; top: 0; left: 0; font-size: 20px;}
 
+        /* 输入框 - 胶囊质感 */
         #bottom-toolbar {
             position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
             width: clamp(350px, 80%, 700px); display: flex; justify-content: center;
         }
-        #input-wrapper-v3 { border-radius: 50px; padding: 8px 20px; display: flex; align-items: center; width: 100%; }
-        #main-input { background: transparent; border: none; color: var(--text-dark); font-size: 16px; outline: none; flex: 1; padding: 10px; margin: 0 10px; }
+        #input-wrapper-v3 { 
+            border-radius: 50px; padding: 8px 10px 8px 25px; display: flex; align-items: center; width: 100%; 
+            transition: all 0.3s; box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        }
+        #input-wrapper-v3:focus-within { box-shadow: 0 15px 40px rgba(0,0,0,0.12); transform: translateY(-2px); background: rgba(255,255,255,0.8);}
+        #main-input { background: transparent; border: none; color: var(--text-dark); font-size: 16px; outline: none; flex: 1; margin: 0 10px; font-weight: 500;}
+        #main-input::placeholder { color: #a0aab5; font-weight: 400;}
         
         .input-icon-btn {
-            background: var(--accent-yellow); color: var(--text-dark); border: none; border-radius: 50%; 
-            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; font-size: 18px;
+            background: linear-gradient(135deg, #FFDF33, #FFB300); color: #fff; border: none; border-radius: 50%; 
+            width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; font-size: 20px;
+            box-shadow: 0 4px 10px rgba(255, 179, 0, 0.3);
         }
-        .input-icon-btn:hover { transform: scale(1.1); }
+        .input-icon-btn:hover { transform: scale(1.1) rotate(15deg); box-shadow: 0 6px 15px rgba(255, 179, 0, 0.5); }
 
         #status-indicator {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            padding: 8px 20px; border-radius: 50px; font-size: 14px; font-weight: bold; display: none;
-            background: var(--accent-yellow); color: var(--text-dark);
-            animation: breathe 1s infinite alternate; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+            padding: 10px 25px; border-radius: 50px; font-size: 14px; font-weight: bold; display: none;
+            background: linear-gradient(135deg, #FFD700, #FF8C00); color: #fff;
+            animation: breathe 1.5s infinite alternate ease-in-out; 
+            box-shadow: 0 8px 20px rgba(255, 140, 0, 0.4);
+            border: 1px solid rgba(255,255,255,0.4);
         }
-        @keyframes breathe { 0% { opacity: 0.6; } 100% { opacity: 1; } }
+        @keyframes breathe { 0% { opacity: 0.8; transform: translateX(-50%) scale(0.98); } 100% { opacity: 1; transform: translateX(-50%) scale(1.02); } }
 
-        /* ================= 优雅的消息弹窗 ================= */
+        /* ================= Toast 消息 ================= */
         #toast-message {
             position: fixed; top: 30px; left: 50%; transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.85); color: #fff; padding: 12px 24px; border-radius: 30px;
-            font-size: 14px; z-index: 9999; display: none; opacity: 0; transition: opacity 0.3s ease;
+            background: rgba(30, 41, 59, 0.9); color: #fff; padding: 12px 28px; border-radius: 30px;
+            font-size: 14px; font-weight: 500; z-index: 9999; display: none; opacity: 0; transition: opacity 0.3s ease;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2); pointer-events: none; text-align: center;
+            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
         }
 
-        /* ================= 面板 ================= */
-        #overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7); backdrop-filter: blur(5px); z-index: 150; pointer-events: auto; }
-        .panel { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 25px; border-radius: 16px; z-index: 200; width: 300px; text-align: center; pointer-events: auto; }
+        /* ================= 面板窗口 ================= */
+        #overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(244, 247, 249, 0.6); backdrop-filter: blur(8px); z-index: 150; pointer-events: auto; transition: 0.3s;}
+        .panel { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 30px; border-radius: 20px; z-index: 200; width: 320px; text-align: center; pointer-events: auto; animation: slideDown 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         
-        #settings-modal { width: 320px; }
-        #history-panel { top: 70px; right: 70px; left: auto; transform: none; width: 200px; max-height: 300px; overflow-y: auto; text-align: left; }
-        #collection-panel { top: 120px; right: 20px; left: auto; transform: none; width: 240px; max-height: 400px; overflow-y: auto; text-align: left; }
-        
-        .panel input { width: 90%; padding: 10px; margin: 15px 0; border-radius: 8px; border: 1px solid #ddd; outline: none; }
-        .primary-btn { background: var(--accent-yellow); color: var(--text-dark); border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.3s; font-size: 14px;}
-        .primary-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4); }
-        .panel h3 { margin: 0 0 10px 0; font-size: 15px; color: #555; }
-        .list-container { list-style: none; padding: 0; margin: 0; font-size: 13px; margin-bottom: 15px; }
-        .list-container li { margin-bottom: 8px; padding: 6px 10px; background: rgba(0,0,0,0.04); border-radius: 6px; display: inline-block; margin-right: 5px; border: 1px solid rgba(0,0,0,0.05);}
+        @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -60%); } to { opacity: 1; transform: translate(-50%, -50%); } }
 
+        #settings-modal { width: 340px; }
+        #history-panel { top: 80px; right: 80px; left: auto; transform: none; width: 220px; max-height: 350px; overflow-y: auto; text-align: left; animation: slideLeft 0.3s ease;}
+        #collection-panel { top: 140px; right: 20px; left: auto; transform: none; width: 260px; max-height: 450px; overflow-y: auto; text-align: left; animation: slideLeft 0.3s ease;}
+        
+        @keyframes slideLeft { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+        .panel input { 
+            width: 88%; padding: 12px 15px; margin: 20px 0; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); outline: none; 
+            background: rgba(255,255,255,0.6); font-size: 14px; transition: 0.3s;
+        }
+        .panel input:focus { background: #fff; box-shadow: 0 0 0 3px rgba(255,215,0,0.3); border-color: var(--accent-yellow);}
+        
+        .primary-btn { 
+            background: linear-gradient(135deg, var(--text-dark), #1a252f); color: #fff; border: none; padding: 14px 20px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.3s; font-size: 15px;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        }
+        .primary-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
+        .primary-btn.yellow { background: linear-gradient(135deg, #FFD700, #FF8C00); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.1); box-shadow: 0 6px 15px rgba(255,140,0,0.3); }
+        .primary-btn.yellow:hover { box-shadow: 0 8px 20px rgba(255,140,0,0.4); }
+
+        .panel h3 { margin: 0 0 15px 0; font-size: 16px; color: var(--text-dark); display: flex; align-items: center; gap: 8px;}
+        
+        /* 列表项微修饰 */
+        .list-container { list-style: none; padding: 0; margin: 0; font-size: 13px; margin-bottom: 20px; }
+        .list-container li { 
+            margin-bottom: 8px; padding: 8px 12px; background: rgba(255,255,255,0.6); border-radius: 8px; display: inline-block; margin-right: 6px; 
+            border: 1px solid rgba(255,255,255,0.8); box-shadow: 0 2px 5px rgba(0,0,0,0.02); transition: 0.2s; cursor: default;
+        }
+        .list-container li:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.05);}
+
+        /* 生成文档弹窗 */
         #document-modal {
             display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: clamp(300px, 80%, 700px); height: 70vh; padding: 30px; border-radius: 20px; z-index: 300;
-            display: flex; flex-direction: column; gap: 15px; background: var(--bg-color); border: 1px solid var(--line-gray); box-shadow: 0 20px 50px rgba(0,0,0,0.15); pointer-events: auto;
+            width: clamp(320px, 85%, 750px); height: 75vh; padding: 35px; border-radius: 24px; z-index: 300;
+            display: flex; flex-direction: column; gap: 20px; pointer-events: auto; animation: slideDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        #doc-content { flex: 1; overflow-y: auto; font-size: 15px; line-height: 1.6; padding: 15px; background: #f9f9f9; border-radius: 10px; white-space: pre-wrap; color: var(--text-dark); text-align: left;}
-        .doc-actions { display: flex; gap: 10px; justify-content: flex-end; }
-        .btn-outline { padding: 10px 15px; border-radius: 8px; border: 1px solid var(--line-gray); cursor: pointer; background: transparent; color: var(--text-dark); font-weight: bold; }
+        #doc-content { 
+            flex: 1; overflow-y: auto; font-size: 15px; line-height: 1.7; padding: 20px; 
+            background: rgba(255,255,255,0.6); border-radius: 16px; white-space: pre-wrap; color: var(--text-dark); text-align: left;
+            border: 1px solid rgba(255,255,255,0.8); box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);
+        }
+        /* 自定义滚动条 */
+        #doc-content::-webkit-scrollbar { width: 8px; }
+        #doc-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+        
+        .doc-actions { display: flex; gap: 15px; justify-content: flex-end; }
+        .btn-outline { padding: 12px 20px; border-radius: 12px; border: 2px solid rgba(0,0,0,0.1); cursor: pointer; background: transparent; color: var(--text-dark); font-weight: bold; transition: 0.3s;}
+        .btn-outline:hover { background: rgba(0,0,0,0.05); }
     </style>
 </head>
 <body>
+
+    <!-- 动态流光背景 -->
+    <div class="ambient-bg">
+        <div class="blob blob1"></div>
+        <div class="blob blob2"></div>
+        <div class="blob blob3"></div>
+    </div>
 
     <!-- 画布区 -->
     <div id="zoom-container">
@@ -143,22 +267,22 @@
 
     <!-- UI 交互区 -->
     <div id="ui-layer">
-        <div id="status-indicator" class="pointer-auto">星系运转中...</div>
+        <div id="status-indicator" class="pointer-auto">✨ 宇宙正在进行头脑风暴...</div>
         <div id="toast-message"></div>
         
-        <button id="settings-btn" class="glass-btn pointer-auto">⚙️</button>
-        <button id="history-btn" class="glass-btn pointer-auto">🕒</button>
-        <button id="collection-btn" class="glass-btn pointer-auto">📥 <span id="collection-badge">0</span></button>
+        <button id="settings-btn" class="glass glass-btn pointer-auto" title="设置 API Key">⚙️</button>
+        <button id="history-btn" class="glass glass-btn pointer-auto" title="历史起点">🕒</button>
+        <button id="collection-btn" class="glass glass-btn pointer-auto" title="灵感收集箱">📥 <span id="collection-badge">0</span></button>
         
         <div id="scale-control" class="pointer-auto">
-            <button id="scale-in" class="glass-btn scale-btn">+</button>
-            <button id="scale-out" class="glass-btn scale-btn">-</button>
+            <button id="scale-in" class="glass glass-btn scale-btn" title="放大">+</button>
+            <button id="scale-out" class="glass glass-btn scale-btn" title="缩小">-</button>
         </div>
 
         <div id="bottom-toolbar" class="pointer-auto">
             <div id="input-wrapper-v3" class="glass">
-                <span style="color:#888; font-size:20px; margin-right:10px;">+</span>
-                <input type="text" id="main-input" placeholder="输入核心词汇，按回车发散..." autocomplete="off">
+                <span style="color:#888; font-size:22px; margin-right:8px; user-select:none;">💡</span>
+                <input type="text" id="main-input" placeholder="输入灵感火花，按回车发散..." autocomplete="off">
                 <button id="input-wand" class="input-icon-btn">✨</button>
             </div>
         </div>
@@ -168,10 +292,12 @@
     <div id="overlay"></div>
     
     <div id="settings-modal" class="glass panel">
-        <h3 style="margin-top:0;">配置 Gemini API Key</h3>
-        <p style="font-size:12px; color:#888;">填写后系统将自动为您测试并分配可用模型</p>
+        <h3>⚙️ 动力核心配置 (API Key)</h3>
+        <p style="font-size:13px; color:#666; line-height: 1.5; margin-top:5px;">
+            系统已搭载<b>智能探测引擎</b>。<br>填写后，系统将自动在后台为您寻找最快、最强的大模型节点。
+        </p>
         <input type="password" id="api-key-input" placeholder="粘贴您的私人 API Key...">
-        <button class="primary-btn" onclick="saveApiKey()">保存并开始</button>
+        <button class="primary-btn" onclick="saveApiKey()">保存配置并连接</button>
     </div>
 
     <div id="history-panel" class="glass panel">
@@ -182,17 +308,18 @@
     <div id="collection-panel" class="glass panel">
         <h3>📥 灵感收集箱</h3>
         <ul id="collection-list" class="list-container">
-            <p style="font-size:12px; color:#888; margin: 10px 0;">右键点击画布上的任意词语即可收集。</p>
+            <p style="font-size:12px; color:#888; margin: 10px 0; text-align: center;">💡 右键点击画布上的词汇即可收集</p>
         </ul>
-        <button id="generate-doc-btn" class="primary-btn">✨ 一键生成创意文档</button>
+        <button id="generate-doc-btn" class="primary-btn yellow">✨ 一键生成绝妙企划案</button>
     </div>
 
-    <div id="document-modal">
-        <h2 style="margin:0 0 10px 0;">📄 您的专属创意企划</h2>
+    <div id="document-modal" class="glass panel">
+        <h2 style="margin:0 0 5px 0; color: var(--text-dark); display: flex; align-items: center; gap: 10px;">📄 您的专属创意企划</h2>
+        <p style="font-size: 13px; color: #666; margin: 0 0 15px 0;">基于您甄选的灵感碎片，AI 为您深度推演的落地概念</p>
         <div id="doc-content"></div>
         <div class="doc-actions">
             <button class="btn-outline" onclick="closeDocumentModal()">关闭预览</button>
-            <button class="primary-btn" style="width:auto;" onclick="copyDocument()">📋 复制文档</button>
+            <button class="primary-btn yellow" style="width:auto;" onclick="copyDocument()">📋 一键复制文档</button>
         </div>
     </div>
 
@@ -200,12 +327,13 @@
         // 环境全局代理变量 (针对内部测试环境预留)
         const envApiKey = typeof apiKey !== 'undefined' ? apiKey : "";
         
-        const colorPalette = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#BDE0FE', '#A2D2FF', '#FFE5D9'];
+        // 莫兰迪/马卡龙高级色盘
+        const colorPalette = ['#FF9A9E', '#FECFEF', '#A1C4FD', '#C2E9FB', '#D4FC79', '#96E6A1', '#E0C3FC', '#8EC5FC'];
 
         let nodes = []; let links = []; let collectedWords = new Set();
         let nodeIdCounter = 0; let currentScale = 1;
         
-        // 【核心状态】记录当前成功接通的模型，避免重复测试
+        // 【核心状态】记录当前成功接通的模型
         let workingModel = null;
         
         // 精确区分“拖拽”与“点击”
@@ -222,7 +350,7 @@
         const overlay = document.getElementById('overlay');
         const toastMessage = document.getElementById('toast-message');
 
-        // ================= 安全消息提示框 =================
+        // ================= 优雅消息提示框 =================
         let toastTimeout;
         function showToast(message, duration = 3000) {
             clearTimeout(toastTimeout);
@@ -241,14 +369,15 @@
             document.getElementById('api-key-input').value = localStorage.getItem('gemini_api_key') || '';
             document.getElementById('settings-modal').style.display = 'block'; 
             overlay.style.display = 'block';
+            overlay.style.opacity = '1';
         };
         
         function saveApiKey() {
             const key = document.getElementById('api-key-input').value.trim();
             if(key) { 
                 localStorage.setItem('gemini_api_key', key); 
-                workingModel = null; // Key 改变时重新触发模型探测
-                showToast("API Key 已保存，下次发散将自动测试模型");
+                workingModel = null; 
+                showToast("✅ 配置已更新，AI 引擎已待命");
             } else { 
                 localStorage.removeItem('gemini_api_key'); 
             }
@@ -276,7 +405,7 @@
             zoomContainer.style.transform = `scale(${currentScale})`;
         }
 
-        // ================= 完美拖拽逻辑 (支持鼠标 & 触摸屏) =================
+        // ================= 伪3D拖拽逻辑 (支持鼠标 & 触摸屏) =================
         function handleDragStart(e) {
             const nodeEl = e.target.closest('.mind-node');
             if (nodeEl) {
@@ -342,8 +471,11 @@
 
                 const text = inputField.value.trim(); inputField.value = ''; 
                 document.getElementById('history-list').prepend(Object.assign(document.createElement('li'), {innerText: text}));
-                clearCanvas(); inputField.placeholder = "+ 继续输入新的起点...";
-                const newNodeId = createNode(text, "...", window.innerWidth/2, window.innerHeight/2, true, '#1a1a1a', true);
+                clearCanvas(); inputField.placeholder = "继续注入灵感...";
+                
+                // 给中心节点赋予随机基调颜色
+                const baseColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+                const newNodeId = createNode(text, "...", window.innerWidth/2, window.innerHeight/2, true, baseColor, true);
                 renderNodes();
                 try {
                     const trans = await callGeminiAPI(`Translate "${text}" to English concisely. Reply JSON: {"zh":"${text}","en":"trans"}`, true);
@@ -358,11 +490,11 @@
             if (dragMoved) return; 
             if(!getApiKey()) { document.getElementById('settings-btn').click(); return; }
 
-            showLoading("思维发散中...", true);
+            showLoading("✨ 宇宙脑图织造中...", true);
             try {
                 const relatedWords = await callGeminiAPI(`你是一个思维发散引擎。请针对“${text}”发散出6个具象且有创意的关联词汇。返回严格JSON数组：[{"zh":"中文","en":"English"}]`, true);
                 const parentNode = nodes.find(n => n.id === nodeId);
-                const radius = window.innerWidth < 768 ? 130 : 180; 
+                const radius = window.innerWidth < 768 ? 140 : 190; // 稍微扩大半径避免拥挤
                 const angleStep = (2 * Math.PI) / relatedWords.length; let currentAngle = Math.random() * Math.PI; 
                 relatedWords.forEach((wordObj) => {
                     const childX = parentNode.x + radius * Math.cos(currentAngle); const childY = parentNode.y + radius * Math.sin(currentAngle);
@@ -374,7 +506,7 @@
             } catch (error) { 
                 console.error(error);
                 if(error.message !== "Invalid_API_Key") {
-                    showToast("网络连接波动，请再次点击节点重试！"); 
+                    showToast("⚠️ 灵感信号微弱，请再次点击节点重试！"); 
                 }
             } finally { 
                 showLoading("", false); 
@@ -386,7 +518,7 @@
             document.getElementById('collection-badge').innerText = collectedWords.size;
             const list = document.getElementById('collection-list');
             if (collectedWords.size === 0) {
-                list.innerHTML = '<p style="font-size:12px; color:#888; margin: 10px 0;">右键点击画布上的任意词语即可收集。</p>';
+                list.innerHTML = '<p style="font-size:12px; color:#888; margin: 10px 0; text-align:center;">💡 右键点击画布上的词汇即可收集</p>';
             } else {
                 list.innerHTML = ''; 
                 collectedWords.forEach(w => list.appendChild(Object.assign(document.createElement('li'), {innerText: w})));
@@ -405,22 +537,23 @@
             
             updateCollectionUI();
             renderNodes();
+            showToast(collectedWords.has(node.zh) ? "✨ 灵感已入库" : "🗑️ 已移出收集箱", 1500);
         }
 
         // ================= 一键生成文档 =================
         document.getElementById('generate-doc-btn').onclick = async () => {
-            if (collectedWords.size === 0) { showToast("请先右键高亮一些灵感词汇！"); return; }
+            if (collectedWords.size === 0) { showToast("⚠️ 请先在画布上右键挑选一些发光词汇！"); return; }
             if (!getApiKey()) { document.getElementById('settings-btn').click(); return; }
 
             document.getElementById('collection-panel').style.display = 'none';
-            showLoading("正在为您编织创意企划，请稍候...", true); overlay.style.display = 'block';
+            showLoading("✨ 正在为您编织超级企划案...", true); overlay.style.display = 'block';
 
             const prompt = `我正在头脑风暴，挑选了核心词：【${Array.from(collectedWords).join("、")}】。请写一份结构完整的《创意企划概念案》。包含：1.方案命名 2.核心概念 3.灵感串联解析 4.落地应用场景。直接输出排版清晰的文章。`;
             try {
                 document.getElementById('doc-content').innerText = await callGeminiAPI(prompt, false);
                 document.getElementById('document-modal').style.display = 'flex';
             } catch (err) { 
-                showToast("生成失败，请刷新页面重试。"); 
+                showToast("⚠️ 生成失败，可能是模型正在打盹，请重试。"); 
                 overlay.style.display = 'none'; 
             } finally { 
                 showLoading("", false); 
@@ -440,9 +573,9 @@
             textArea.select();
             try { 
                 document.execCommand('copy'); 
-                showToast("✅ 已成功复制到剪贴板！"); 
+                showToast("✅ 文档已精美复制，快去粘贴吧！"); 
             } catch (err) { 
-                showToast("❌ 复制失败，请手动选中并复制文本。"); 
+                showToast("❌ 复制受阻，请手动全选复制。"); 
             }
             document.body.removeChild(textArea);
         }
@@ -472,12 +605,15 @@
                     div.addEventListener('contextmenu', (e) => onNodeRightClick(e, node.id));
                     container.appendChild(div);
                 }
+                
+                // 应用 CSS 变量来注入颜色，配合 CSS 实现 3D 渐变
+                div.style.setProperty('--node-color', node.color);
                 div.className = `mind-node ${node.isCentral ? 'central' : 'normal'}`;
-                if (collectedWords.has(node.zh)) { div.classList.add('collected'); div.style.backgroundColor = ''; div.style.border = ''; } 
-                else {
+                
+                if (collectedWords.has(node.zh)) { 
+                    div.classList.add('collected'); 
+                } else {
                     div.classList.remove('collected');
-                    if (node.isCentral) { div.style.backgroundColor = node.color; div.style.border = 'none'; } 
-                    else { div.style.backgroundColor = '#fff'; div.style.border = `2px solid ${node.color}`; }
                 }
                 div.style.left = `${node.x}px`; div.style.top = `${node.y}px`;
             });
@@ -501,14 +637,11 @@
             const key = getApiKey();
             if (!key) throw new Error("API Key 缺失");
 
-            // 可选模型列表（按推荐优先级排列）
             let modelsToTry = [];
             
             if (workingModel) {
-                // 如果之前已经试成功过某个模型，以后都用它
                 modelsToTry = [workingModel];
             } else {
-                // 如果是首次请求，按顺序全盘测试
                 modelsToTry = [
                     "gemini-2.5-flash",
                     "gemini-1.5-flash",
@@ -516,7 +649,7 @@
                     "gemini-pro",
                     "gemini-2.5-flash-preview-09-2025"
                 ];
-                showToast("正在自动探测可用模型，请稍候...", 4000);
+                showToast("🔍 正在扫描可用 AI 节点...", 4000);
             }
             
             const payload = { contents: [{ parts: [{ text: prompt }] }] };
@@ -532,17 +665,15 @@
                         body: JSON.stringify(payload)
                     });
 
-                    // 如果遇到 404（模型找不到/不支持），直接捕获异常进入下一轮循环尝试新模型
                     if (response.status === 404) {
-                        console.warn(`[探测] 模型 ${model} 不被当前 Key 支持，尝试下一个...`);
+                        console.warn(`[探测] 模型 ${model} 不适用，切换下一个...`);
                         continue; 
                     }
 
-                    // 如果遇到权限问题，停止探测，弹窗提示
                     if (response.status === 401 || response.status === 403) {
                         localStorage.removeItem('gemini_api_key');
                         document.getElementById('settings-btn').click();
-                        showToast("API Key 无效或未授权，请检查重新填写！", 4000);
+                        showToast("🚫 密钥未授权或已失效，请重新配置！", 4000);
                         throw new Error("Invalid_API_Key");
                     }
 
@@ -551,11 +682,10 @@
                         throw new Error(`HTTP ${response.status}: ${errorData.error?.message || ''}`);
                     }
                     
-                    // 【成功找到可用模型！】
                     if (!workingModel) {
-                        workingModel = model; // 缓存可用模型
-                        console.log(`[探测成功] 已锁定可用模型: ${model}`);
-                        showToast(`已成功连接 AI 模型！`, 2000);
+                        workingModel = model; 
+                        console.log(`[探测成功] 已锁定高性能节点: ${model}`);
+                        showToast(`🚀 AI 节点连接成功！`, 2000);
                     }
 
                     const data = await response.json();
@@ -576,14 +706,12 @@
 
                 } catch (err) {
                     lastError = err;
-                    // 如果是 API Key 无效错误，跳出循环不再重试
                     if (err.message === "Invalid_API_Key") break;
                 }
             }
             
-            // 所有模型都遍历完了依然没有返回
             if(lastError && lastError.message !== "Invalid_API_Key") {
-                throw lastError || new Error("所有可用模型均无法访问。");
+                throw lastError || new Error("星系链路暂不可用。");
             }
             throw new Error("请求被中断");
         }
