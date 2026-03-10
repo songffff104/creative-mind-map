@@ -1,472 +1,906 @@
+# mindmap_fixed.html
+
+```html
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创意发散器 V7 (全平台智能版)</title>
-    <style>
-        /* ================= 视觉与布局 ================= */
-        :root {
-            --bg-color: #ffffff;
-            --text-dark: #333333;
-            --line-gray: #d0d0d0;
-            --accent-yellow: #FFD700;
-            --node-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            --glass-bg: rgba(255, 255, 255, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.2);
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>创意发散器 V5.4（修复版）</title>
+  <style>
+    :root {
+      --bg-color: #ffffff;
+      --text-dark: #333333;
+      --line-gray: #d0d0d0;
+      --accent-yellow: #ffd700;
+      --node-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      --glass-bg: rgba(255, 255, 255, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.2);
+    }
 
-        body, html {
-            margin: 0; padding: 0; width: 100vw; height: 100vh;
-            background-color: var(--bg-color);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden; user-select: none;
-        }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      background: var(--bg-color);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-dark);
+    }
 
-        .glass {
-            background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05); color: var(--text-dark);
-        }
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+      color: var(--text-dark);
+    }
 
-        /* 统一缩放容器 */
-        #zoom-container {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; transform-origin: 0 0;
-        }
-        
-        #canvas-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;}
-        .mind-edge { stroke: var(--line-gray); stroke-width: 1.5; transition: stroke 0.3s; }
+    #zoom-container {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      transform-origin: 0 0;
+    }
 
-        #nodes-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
-        
-        .mind-node {
-            position: absolute; border-radius: 50%; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; transform: translate(-50%, -50%);
-            cursor: grab; box-shadow: var(--node-shadow); transition: transform 0.2s, box-shadow 0.2s;
-            text-align: center; padding: 10px; word-wrap: break-word; background-color: #fff;
-        }
-        .mind-node:hover { transform: translate(-50%, -50%) scale(1.05); }
-        .mind-node.dragging { cursor: grabbing; box-shadow: 0 12px 35px rgba(0,0,0,0.2); transform: translate(-50%, -50%) scale(1.05); z-index: 10;}
-        
-        .node-zh { font-weight: bold; font-size: 14px; line-height: 1.2; pointer-events: none; }
-        .node-en { font-size: 10px; opacity: 0.85; margin-top: 4px; line-height: 1.1; pointer-events: none; }
+    #canvas-svg,
+    #nodes-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
 
-        .mind-node.central { width: 110px; height: 110px; font-size: 18px; color: #fff; border: none; }
-        .mind-node.normal { width: 80px; height: 80px; color: var(--text-dark); }
-        
-        /* 收集状态：明黄高亮 */
-        .mind-node.collected { 
-            background-color: var(--accent-yellow) !important; color: var(--text-dark) !important; 
-            border: 3px solid #fff !important; box-shadow: 0 0 20px rgba(255, 215, 0, 0.6) !important; 
-        }
+    #canvas-svg {
+      z-index: 1;
+      pointer-events: none;
+    }
 
-        /* ================= UI 悬浮层 (不遮挡画布) ================= */
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; }
-        .pointer-auto { pointer-events: auto; }
+    #nodes-container { z-index: 2; }
 
-        .glass-btn {
-            background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text-dark);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05); transition: 0.3s;
-            width: 40px; height: 40px; border-radius: 12px; cursor: pointer; font-size: 18px; font-weight: bold;
-            display: flex; align-items: center; justify-content: center; position: absolute;
-        }
-        .glass-btn:hover { background: rgba(255,255,255,0.9); transform: translateY(-2px); }
-        
-        #settings-btn { top: 20px; left: 20px; }
-        #history-btn { top: 20px; right: 20px; }
-        #collection-btn { top: 70px; right: 20px; width: auto; padding: 0 15px; gap: 8px; }
-        #collection-badge { background: var(--accent-yellow); color: var(--text-dark); border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold;}
+    .mind-edge {
+      stroke: var(--line-gray);
+      stroke-width: 1.5;
+      transition: stroke 0.3s;
+    }
 
-        #scale-control { position: absolute; bottom: 40px; left: 20px; display: flex; flex-direction: column; gap: 10px; }
-        .scale-btn { position: relative; top: 0; left: 0; }
+    .mind-node {
+      position: absolute;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      transform: translate(-50%, -50%);
+      cursor: grab;
+      box-shadow: var(--node-shadow);
+      transition: transform 0.2s, box-shadow 0.2s;
+      text-align: center;
+      padding: 10px;
+      word-wrap: break-word;
+      background: #fff;
+      box-sizing: border-box;
+    }
 
-        #bottom-toolbar {
-            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
-            width: clamp(350px, 80%, 700px); display: flex; justify-content: center;
-        }
-        #input-wrapper-v3 { border-radius: 50px; padding: 8px 20px; display: flex; align-items: center; width: 100%; }
-        #main-input { background: transparent; border: none; color: var(--text-dark); font-size: 16px; outline: none; flex: 1; padding: 10px; margin: 0 10px; }
-        
-        .input-icon-btn {
-            background: var(--accent-yellow); color: var(--text-dark); border: none; border-radius: 50%; 
-            width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; font-size: 18px;
-        }
-        .input-icon-btn:hover { transform: scale(1.1); }
+    .mind-node:hover { transform: translate(-50%, -50%) scale(1.05); }
+    .mind-node.dragging {
+      cursor: grabbing;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+      transform: translate(-50%, -50%) scale(1.05);
+      z-index: 10;
+    }
 
-        #status-indicator {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            padding: 8px 20px; border-radius: 50px; font-size: 14px; font-weight: bold; display: none;
-            background: var(--accent-yellow); color: var(--text-dark);
-            animation: breathe 1s infinite alternate; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
-        }
-        @keyframes breathe { 0% { opacity: 0.6; } 100% { opacity: 1; } }
+    .node-zh {
+      font-weight: bold;
+      font-size: 14px;
+      line-height: 1.2;
+      pointer-events: none;
+    }
 
-        /* ================= 面板 ================= */
-        #overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7); backdrop-filter: blur(5px); z-index: 150; pointer-events: auto; }
-        .panel { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 25px; border-radius: 16px; z-index: 200; width: 300px; text-align: center; pointer-events: auto; }
-        
-        #settings-modal { width: 320px; }
-        #history-panel { top: 70px; right: 70px; left: auto; transform: none; width: 200px; max-height: 300px; overflow-y: auto; text-align: left; }
-        #collection-panel { top: 120px; right: 20px; left: auto; transform: none; width: 240px; max-height: 400px; overflow-y: auto; text-align: left; }
-        
-        .panel input { width: 90%; padding: 10px; margin: 15px 0; border-radius: 8px; border: 1px solid #ddd; outline: none; }
-        .primary-btn { background: var(--accent-yellow); color: var(--text-dark); border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.3s; font-size: 14px;}
-        .primary-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4); }
-        .panel h3 { margin: 0 0 10px 0; font-size: 15px; color: #555; }
-        .list-container { list-style: none; padding: 0; margin: 0; font-size: 13px; margin-bottom: 15px; }
-        .list-container li { margin-bottom: 8px; padding: 6px 10px; background: rgba(0,0,0,0.04); border-radius: 6px; display: inline-block; margin-right: 5px; border: 1px solid rgba(0,0,0,0.05);}
+    .node-en {
+      font-size: 10px;
+      opacity: 0.85;
+      margin-top: 4px;
+      line-height: 1.1;
+      pointer-events: none;
+    }
 
-        #document-modal {
-            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: clamp(300px, 80%, 700px); height: 70vh; padding: 30px; border-radius: 20px; z-index: 300;
-            display: flex; flex-direction: column; gap: 15px; background: var(--bg-color); border: 1px solid var(--line-gray); box-shadow: 0 20px 50px rgba(0,0,0,0.15); pointer-events: auto;
-        }
-        #doc-content { flex: 1; overflow-y: auto; font-size: 15px; line-height: 1.6; padding: 15px; background: #f9f9f9; border-radius: 10px; white-space: pre-wrap; color: var(--text-dark); }
-        .doc-actions { display: flex; gap: 10px; justify-content: flex-end; }
-        .btn-outline { padding: 10px 15px; border-radius: 8px; border: 1px solid var(--line-gray); cursor: pointer; background: transparent; color: var(--text-dark); font-weight: bold; }
-    </style>
+    .mind-node.central {
+      width: 110px;
+      height: 110px;
+      font-size: 18px;
+      color: #fff;
+      border: none;
+    }
+
+    .mind-node.normal {
+      width: 80px;
+      height: 80px;
+      color: var(--text-dark);
+    }
+
+    .mind-node.collected {
+      background-color: var(--accent-yellow) !important;
+      color: var(--text-dark) !important;
+      border: 3px solid #fff !important;
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.6) !important;
+    }
+
+    #ui-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .pointer-auto { pointer-events: auto; }
+
+    .glass-btn {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      color: var(--text-dark);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      transition: 0.3s;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+    }
+
+    .glass-btn:hover {
+      background: rgba(255, 255, 255, 0.9);
+      transform: translateY(-2px);
+    }
+
+    #settings-btn { top: 20px; left: 20px; }
+    #history-btn { top: 20px; right: 20px; }
+    #collection-btn { top: 70px; right: 20px; width: auto; padding: 0 15px; gap: 8px; }
+
+    #collection-badge {
+      background: var(--accent-yellow);
+      color: var(--text-dark);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    #scale-control {
+      position: absolute;
+      bottom: 40px;
+      left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .scale-btn { position: relative; top: 0; left: 0; }
+
+    #bottom-toolbar {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: clamp(350px, 80%, 700px);
+      display: flex;
+      justify-content: center;
+    }
+
+    #input-wrapper-v3 {
+      border-radius: 50px;
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+
+    #main-input {
+      background: transparent;
+      border: none;
+      color: var(--text-dark);
+      font-size: 16px;
+      outline: none;
+      flex: 1;
+      padding: 10px;
+      margin: 0 10px;
+    }
+
+    .input-icon-btn {
+      background: var(--accent-yellow);
+      color: var(--text-dark);
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: 0.3s;
+      font-size: 18px;
+    }
+
+    .input-icon-btn:hover { transform: scale(1.1); }
+
+    #status-indicator {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 20px;
+      border-radius: 50px;
+      font-size: 14px;
+      font-weight: bold;
+      display: none;
+      background: var(--accent-yellow);
+      color: var(--text-dark);
+      animation: breathe 1s infinite alternate;
+      box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+    }
+
+    @keyframes breathe {
+      0% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+
+    #overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(5px);
+      z-index: 150;
+      pointer-events: auto;
+    }
+
+    .panel {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 25px;
+      border-radius: 16px;
+      z-index: 200;
+      width: 300px;
+      text-align: center;
+      pointer-events: auto;
+    }
+
+    #history-panel {
+      top: 70px;
+      right: 70px;
+      left: auto;
+      transform: none;
+      width: 200px;
+      max-height: 300px;
+      overflow-y: auto;
+      text-align: left;
+    }
+
+    #collection-panel {
+      top: 120px;
+      right: 20px;
+      left: auto;
+      transform: none;
+      width: 240px;
+      max-height: 400px;
+      overflow-y: auto;
+      text-align: left;
+    }
+
+    .panel input {
+      width: 90%;
+      padding: 10px;
+      margin: 15px 0;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      outline: none;
+    }
+
+    .primary-btn {
+      background: var(--accent-yellow);
+      color: var(--text-dark);
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+      transition: 0.3s;
+      font-size: 14px;
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+    }
+
+    .panel h3 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      color: #555;
+    }
+
+    .list-container {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 15px;
+      font-size: 13px;
+    }
+
+    .list-container li {
+      margin-bottom: 8px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.04);
+      border-radius: 6px;
+      display: inline-block;
+      margin-right: 5px;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    #document-modal {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: clamp(300px, 80%, 700px);
+      height: 70vh;
+      padding: 30px;
+      border-radius: 20px;
+      z-index: 300;
+      flex-direction: column;
+      gap: 15px;
+      background: var(--bg-color);
+      border: 1px solid var(--line-gray);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+      pointer-events: auto;
+      box-sizing: border-box;
+    }
+
+    #doc-content {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 15px;
+      background: #f9f9f9;
+      border-radius: 10px;
+      white-space: pre-wrap;
+      color: var(--text-dark);
+    }
+
+    .doc-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .btn-outline {
+      padding: 10px 15px;
+      border-radius: 8px;
+      border: 1px solid var(--line-gray);
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-dark);
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
+  <div id="zoom-container">
+    <svg id="canvas-svg"></svg>
+    <div id="nodes-container"></div>
+  </div>
 
-    <!-- 画布区 -->
-    <div id="zoom-container">
-        <svg id="canvas-svg"></svg>
-        <div id="nodes-container"></div>
+  <div id="ui-layer">
+    <div id="status-indicator" class="pointer-auto">星系运转中...</div>
+
+    <button id="settings-btn" class="glass-btn pointer-auto">⚙️</button>
+    <button id="history-btn" class="glass-btn pointer-auto">🕒</button>
+    <button id="collection-btn" class="glass-btn pointer-auto">📥 <span id="collection-badge">0</span></button>
+
+    <div id="scale-control" class="pointer-auto">
+      <button id="scale-in" class="glass-btn scale-btn">+</button>
+      <button id="scale-out" class="glass-btn scale-btn">-</button>
     </div>
 
-    <!-- UI 交互区 -->
-    <div id="ui-layer">
-        <div id="status-indicator" class="pointer-auto">星系运转中...</div>
-        
-        <button id="settings-btn" class="glass-btn pointer-auto">⚙️</button>
-        <button id="history-btn" class="glass-btn pointer-auto">🕒</button>
-        <button id="collection-btn" class="glass-btn pointer-auto">📥 <span id="collection-badge">0</span></button>
-        
-        <div id="scale-control" class="pointer-auto">
-            <button id="scale-in" class="glass-btn scale-btn">+</button>
-            <button id="scale-out" class="glass-btn scale-btn">-</button>
-        </div>
-
-        <div id="bottom-toolbar" class="pointer-auto">
-            <div id="input-wrapper-v3" class="glass">
-                <span style="color:#888; font-size:20px; margin-right:10px;">+</span>
-                <input type="text" id="main-input" placeholder="输入核心词汇，按回车发散..." autocomplete="off">
-                <button id="input-wand" class="input-icon-btn">✨</button>
-            </div>
-        </div>
+    <div id="bottom-toolbar" class="pointer-auto">
+      <div id="input-wrapper-v3" class="glass">
+        <span style="color:#888;font-size:20px;margin-right:10px;">+</span>
+        <input type="text" id="main-input" placeholder="输入核心词汇，按回车发散..." autocomplete="off" />
+        <button id="input-wand" class="input-icon-btn">✨</button>
+      </div>
     </div>
+  </div>
 
-    <!-- 弹窗遮罩与面板 -->
-    <div id="overlay"></div>
-    
-    <!-- 设置面板重磅回归 -->
-    <div id="settings-modal" class="glass panel">
-        <h3 style="margin-top:0;">配置 Gemini API Key</h3>
-        <p style="font-size:12px; color:#888;">如果你在自己的网站上运行，请务必填写私人 Key</p>
-        <input type="password" id="api-key-input" placeholder="粘贴您的私人 API Key...">
-        <button class="primary-btn" onclick="saveApiKey()">保存并开始</button>
+  <div id="overlay"></div>
+
+  <div id="settings-modal" class="glass panel">
+    <h3 style="margin-top:0;">配置 Gemini API Key</h3>
+    <p style="font-size:12px;color:#888;line-height:1.6;">
+      这个版本必须填写你自己的 Gemini API Key 才能调用接口。
+    </p>
+    <input type="password" id="api-key-input" placeholder="粘贴你的 Gemini API Key" />
+    <button class="primary-btn" id="save-api-btn">保存并关闭</button>
+  </div>
+
+  <div id="history-panel" class="glass panel">
+    <h3>🕒 历史起点</h3>
+    <ul id="history-list" class="list-container"></ul>
+  </div>
+
+  <div id="collection-panel" class="glass panel">
+    <h3>📥 灵感收集箱</h3>
+    <ul id="collection-list" class="list-container">
+      <p style="font-size:12px;color:#888;margin:10px 0;">右键点击画布上的任意词语即可收集。</p>
+    </ul>
+    <button id="generate-doc-btn" class="primary-btn">✨ 一键生成创意文档</button>
+  </div>
+
+  <div id="document-modal">
+    <h2 style="margin:0 0 10px 0;">📄 您的专属创意企划</h2>
+    <div id="doc-content"></div>
+    <div class="doc-actions">
+      <button class="btn-outline" id="close-doc-btn">关闭预览</button>
+      <button class="primary-btn" style="width:auto;" id="copy-doc-btn">📋 复制文档</button>
     </div>
+  </div>
 
-    <div id="history-panel" class="glass panel">
-        <h3>🕒 历史起点</h3>
-        <ul id="history-list" class="list-container"></ul>
-    </div>
+  <script>
+    const DEFAULT_MODEL = 'gemini-2.5-flash';
+    const colorPalette = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#BDE0FE', '#A2D2FF', '#FFE5D9'];
 
-    <div id="collection-panel" class="glass panel">
-        <h3>📥 灵感收集箱</h3>
-        <ul id="collection-list" class="list-container">
-            <p style="font-size:12px; color:#888; margin: 10px 0;">右键点击画布上的任意词语即可收集。</p>
-        </ul>
-        <button id="generate-doc-btn" class="primary-btn">✨ 一键生成创意文档</button>
-    </div>
+    let nodes = [];
+    let links = [];
+    let collectedWords = new Set();
+    let nodeIdCounter = 0;
+    let currentScale = 1;
+    let isDragging = false;
+    let draggedNode = null;
+    let startX = 0;
+    let startY = 0;
+    let dragMoved = false;
 
-    <div id="document-modal">
-        <h2 style="margin:0 0 10px 0;">📄 您的专属创意企划</h2>
-        <div id="doc-content"></div>
-        <div class="doc-actions">
-            <button class="btn-outline" onclick="closeDocumentModal()">关闭预览</button>
-            <button class="primary-btn" style="width:auto;" onclick="copyDocument()">📋 复制文档</button>
-        </div>
-    </div>
+    const container = document.getElementById('nodes-container');
+    const zoomContainer = document.getElementById('zoom-container');
+    const svgCanvas = document.getElementById('canvas-svg');
+    const inputField = document.getElementById('main-input');
+    const statusIndicator = document.getElementById('status-indicator');
+    const overlay = document.getElementById('overlay');
+    const documentModal = document.getElementById('document-modal');
 
-    <script>
-        // 【核心】这个变量在当前预览环境下会自动注入，在你的 GitHub 网站上则为空
-        const apiKey = "";
-        
-        const colorPalette = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#BDE0FE', '#A2D2FF', '#FFE5D9'];
+    function openSettings() {
+      document.getElementById('api-key-input').value = localStorage.getItem('gemini_api_key') || '';
+      document.getElementById('settings-modal').style.display = 'block';
+      overlay.style.display = 'block';
+    }
 
-        let nodes = []; let links = []; let collectedWords = new Set();
-        let nodeIdCounter = 0; let currentScale = 1;
+    function saveApiKey() {
+      const key = document.getElementById('api-key-input').value.trim();
+      if (key) {
+        localStorage.setItem('gemini_api_key', key);
+      } else {
+        localStorage.removeItem('gemini_api_key');
+      }
+      document.getElementById('settings-modal').style.display = 'none';
+      overlay.style.display = 'none';
+    }
 
-        const container = document.getElementById('nodes-container');
-        const zoomContainer = document.getElementById('zoom-container');
-        const svgCanvas = document.getElementById('canvas-svg');
-        const inputField = document.getElementById('main-input');
-        const statusIndicator = document.getElementById('status-indicator');
-        const overlay = document.getElementById('overlay');
+    function hideFloatingPanels() {
+      document.getElementById('history-panel').style.display = 'none';
+      document.getElementById('collection-panel').style.display = 'none';
+    }
 
-        // ================= API Key 智能管理 =================
-        document.getElementById('settings-btn').onclick = () => {
-            document.getElementById('api-key-input').value = localStorage.getItem('gemini_api_key') || '';
-            document.getElementById('settings-modal').style.display = 'block'; 
-            overlay.style.display = 'block';
-        };
-        
-        function saveApiKey() {
-            const key = document.getElementById('api-key-input').value.trim();
-            if(key) { localStorage.setItem('gemini_api_key', key); } 
-            else { localStorage.removeItem('gemini_api_key'); }
-            document.getElementById('settings-modal').style.display = 'none'; 
-            overlay.style.display = 'none'; 
+    function toggleHistoryPanel() {
+      const panel = document.getElementById('history-panel');
+      const isOpen = panel.style.display === 'block';
+      hideFloatingPanels();
+      panel.style.display = isOpen ? 'none' : 'block';
+    }
+
+    function toggleCollectionPanel() {
+      const panel = document.getElementById('collection-panel');
+      const isOpen = panel.style.display === 'block';
+      hideFloatingPanels();
+      panel.style.display = isOpen ? 'none' : 'block';
+    }
+
+    function scaleGraph(factor) {
+      currentScale = Math.min(Math.max(currentScale * factor, 0.4), 3);
+      zoomContainer.style.transform = `scale(${currentScale})`;
+    }
+
+    function showLoading(text, show) {
+      statusIndicator.innerText = text;
+      statusIndicator.style.display = show ? 'block' : 'none';
+    }
+
+    function createNode(zhText, enText, x, y, isLarge, color, isCentral) {
+      const id = nodeIdCounter++;
+      nodes.push({ id, zh: zhText, en: enText, x, y, isLarge, color, isCentral });
+      return id;
+    }
+
+    function createLink(sourceId, targetId) {
+      links.push({ source: sourceId, target: targetId });
+    }
+
+    function clearCanvas() {
+      nodes = [];
+      links = [];
+      collectedWords.clear();
+      updateCollectionUI();
+      container.innerHTML = '';
+      svgCanvas.innerHTML = '';
+    }
+
+    function renderLinks() {
+      svgCanvas.innerHTML = '';
+      for (const link of links) {
+        const source = nodes.find(n => n.id === link.source);
+        const target = nodes.find(n => n.id === link.target);
+        if (!source || !target) continue;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', source.x);
+        line.setAttribute('y1', source.y);
+        line.setAttribute('x2', target.x);
+        line.setAttribute('y2', target.y);
+        line.setAttribute('class', 'mind-edge');
+        svgCanvas.appendChild(line);
+      }
+    }
+
+    function createNodeContent(div, node) {
+      div.innerHTML = '';
+      const zh = document.createElement('span');
+      zh.className = 'node-zh';
+      zh.textContent = node.zh;
+      const en = document.createElement('span');
+      en.className = 'node-en';
+      en.textContent = node.en;
+      div.appendChild(zh);
+      div.appendChild(en);
+    }
+
+    function renderNodes() {
+      for (const node of nodes) {
+        let div = document.getElementById(`node-${node.id}`);
+        if (!div) {
+          div = document.createElement('div');
+          div.id = `node-${node.id}`;
+          createNodeContent(div, node);
+          div.addEventListener('click', () => {
+            if (!dragMoved) onNodeClick(node.id, node.zh);
+          });
+          div.addEventListener('contextmenu', (e) => onNodeRightClick(e, node.id));
+          container.appendChild(div);
+        } else {
+          createNodeContent(div, node);
         }
 
-        function getApiKey() { 
-            // 如果环境注入了 Key 就用环境的，否则读取你存在本地的私人 Key
-            return apiKey || localStorage.getItem('gemini_api_key') || ""; 
+        div.className = `mind-node ${node.isCentral ? 'central' : 'normal'}`;
+
+        if (collectedWords.has(node.zh)) {
+          div.classList.add('collected');
+          div.style.backgroundColor = '';
+          div.style.border = '';
+        } else {
+          div.classList.remove('collected');
+          if (node.isCentral) {
+            div.style.backgroundColor = node.color;
+            div.style.border = 'none';
+          } else {
+            div.style.backgroundColor = '#fff';
+            div.style.border = `2px solid ${node.color}`;
+          }
         }
 
-        // ================= 面板与缩放 =================
-        document.getElementById('history-btn').onclick = () => {
-            const p = document.getElementById('history-panel'); p.style.display = p.style.display === 'block' ? 'none' : 'block';
-            document.getElementById('collection-panel').style.display = 'none';
-        };
-        document.getElementById('collection-btn').onclick = () => {
-            const p = document.getElementById('collection-panel'); p.style.display = p.style.display === 'block' ? 'none' : 'block';
-            document.getElementById('history-panel').style.display = 'none';
-        };
-        document.getElementById('scale-in').onclick = () => scaleGraph(1.1);
-        document.getElementById('scale-out').onclick = () => scaleGraph(0.9);
-        function scaleGraph(f) {
-            currentScale = Math.min(Math.max(currentScale * f, 0.4), 3);
-            zoomContainer.style.transform = `scale(${currentScale})`;
-        }
+        div.style.left = `${node.x}px`;
+        div.style.top = `${node.y}px`;
+      }
 
-        // ================= 完美拖拽逻辑 =================
-        let isDragging = false; let draggedNode = null; let startX, startY;
-        document.addEventListener('mousedown', (e) => {
-            const nodeEl = e.target.closest('.mind-node');
-            if (nodeEl) {
-                isDragging = true; draggedNode = nodeEl;
-                startX = e.clientX; startY = e.clientY;
-                draggedNode.dataset.initX = parseFloat(draggedNode.style.left);
-                draggedNode.dataset.initY = parseFloat(draggedNode.style.top);
-                draggedNode.classList.add('dragging');
+      renderLinks();
+    }
+
+    function updateCollectionUI() {
+      document.getElementById('collection-badge').innerText = String(collectedWords.size);
+      const list = document.getElementById('collection-list');
+      if (collectedWords.size === 0) {
+        list.innerHTML = '<p style="font-size:12px;color:#888;margin:10px 0;">右键点击画布上的任意词语即可收集。</p>';
+        return;
+      }
+
+      list.innerHTML = '';
+      for (const word of collectedWords) {
+        const li = document.createElement('li');
+        li.textContent = word;
+        list.appendChild(li);
+      }
+    }
+
+    function onNodeRightClick(e, nodeId) {
+      e.preventDefault();
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) return;
+
+      if (collectedWords.has(node.zh)) {
+        collectedWords.delete(node.zh);
+      } else {
+        collectedWords.add(node.zh);
+      }
+
+      updateCollectionUI();
+      renderNodes();
+    }
+
+    function extractTextFromResponse(data) {
+      const candidate = data?.candidates?.[0];
+      if (!candidate?.content?.parts?.length) return '';
+      return candidate.content.parts
+        .map(part => part.text || '')
+        .join('')
+        .trim();
+    }
+
+    function safeJsonParse(raw) {
+      const text = String(raw || '').trim();
+      try {
+        return JSON.parse(text);
+      } catch {
+        const cleaned = text
+          .replace(/^```json\s*/i, '')
+          .replace(/^```\s*/i, '')
+          .replace(/```$/i, '')
+          .trim();
+        return JSON.parse(cleaned);
+      }
+    }
+
+    async function callGeminiAPI(prompt, expectJson = false) {
+      const userKey = (localStorage.getItem('gemini_api_key') || '').trim();
+      if (!userKey) {
+        throw new Error('缺少 Gemini API Key。请点左上角 ⚙️ 先保存 API Key。');
+      }
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${DEFAULT_MODEL}:generateContent?key=${encodeURIComponent(userKey)}`;
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: expectJson
+          ? {
+              responseMimeType: 'application/json',
+              temperature: 0.3
             }
+          : {
+              temperature: 0.7
+            }
+      };
+
+      const delays = [1000, 2000, 4000];
+
+      for (let i = 0; i <= delays.length; i++) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const message = data?.error?.message || `HTTP ${response.status}`;
+            throw new Error(message);
+          }
+
+          const textResp = extractTextFromResponse(data);
+          if (!textResp) {
+            throw new Error('模型返回为空。');
+          }
+
+          return expectJson ? safeJsonParse(textResp) : textResp;
+        } catch (err) {
+          if (i === delays.length) throw err;
+          await new Promise(resolve => setTimeout(resolve, delays[i]));
+        }
+      }
+    }
+
+    async function trigger发散() {
+      const text = inputField.value.trim();
+      if (!text) return;
+
+      inputField.value = '';
+      document.getElementById('history-list').prepend(Object.assign(document.createElement('li'), { innerText: text }));
+      clearCanvas();
+      inputField.placeholder = '+ 继续输入新的起点...';
+
+      const newNodeId = createNode(text, '...', window.innerWidth / 2, window.innerHeight / 2, true, '#1a1a1a', true);
+      renderNodes();
+
+      try {
+        showLoading('正在生成中心词翻译...', true);
+        const trans = await callGeminiAPI(
+          `把“${text}”翻译成简洁英文，返回 JSON：{"zh":"${text}","en":"..."}`,
+          true
+        );
+
+        const targetNode = nodes.find(n => n.id === newNodeId);
+        if (targetNode && trans?.en) {
+          targetNode.en = trans.en;
+          renderNodes();
+        }
+      } catch (error) {
+        console.error(error);
+        alert(`初始化失败：${error.message}`);
+      } finally {
+        showLoading('', false);
+      }
+    }
+
+    async function onNodeClick(nodeId, text) {
+      showLoading('思维发散中...', true);
+      try {
+        const relatedWords = await callGeminiAPI(
+          `你是一个思维发散引擎。请针对“${text}”发散出 6 个具象且有创意的关联词汇。\n返回严格 JSON 数组，例如：[{"zh":"中文","en":"English"}]`,
+          true
+        );
+
+        if (!Array.isArray(relatedWords) || relatedWords.length === 0) {
+          throw new Error('返回的 JSON 不是有效数组。');
+        }
+
+        const parentNode = nodes.find(n => n.id === nodeId);
+        if (!parentNode) return;
+
+        const radius = 180;
+        const angleStep = (2 * Math.PI) / relatedWords.length;
+        let currentAngle = Math.random() * Math.PI;
+
+        relatedWords.forEach((wordObj) => {
+          const childX = parentNode.x + radius * Math.cos(currentAngle);
+          const childY = parentNode.y + radius * Math.sin(currentAngle);
+          const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+          const childId = createNode(wordObj.zh || '未命名', wordObj.en || '', childX, childY, false, randomColor, false);
+          createLink(nodeId, childId);
+          currentAngle += angleStep;
         });
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging && draggedNode) {
-                const dx = (e.clientX - startX) / currentScale; const dy = (e.clientY - startY) / currentScale;
-                const newX = parseFloat(draggedNode.dataset.initX) + dx; const newY = parseFloat(draggedNode.dataset.initY) + dy;
-                draggedNode.style.left = `${newX}px`; draggedNode.style.top = `${newY}px`;
-                const nodeObj = nodes.find(n => n.id === parseInt(draggedNode.id.split('-')[1]));
-                if(nodeObj) { nodeObj.x = newX; nodeObj.y = newY; }
-                renderLinks();
-            }
-        });
-        document.addEventListener('mouseup', () => {
-            if (isDragging && draggedNode) { draggedNode.classList.remove('dragging'); draggedNode = null; isDragging = false; }
-        });
 
-        // ================= 核心发散交互 =================
-        inputField.addEventListener('keypress', (e) => { if (e.key === 'Enter') trigger发散(); });
-        document.getElementById('input-wand').onclick = trigger发散;
+        renderNodes();
+      } catch (error) {
+        console.error(error);
+        alert(`扩散失败：${error.message}`);
+      } finally {
+        showLoading('', false);
+      }
+    }
 
-        async function trigger发散() {
-            if (inputField.value.trim() !== '') {
-                // 如果是在你的网站上运行，且没填 Key，直接弹出设置
-                if(!getApiKey()) { 
-                    document.getElementById('settings-btn').click(); 
-                    return; 
-                }
+    async function generateDocument() {
+      if (collectedWords.size === 0) {
+        alert('请先右键高亮一些灵感词汇！');
+        return;
+      }
 
-                const text = inputField.value.trim(); inputField.value = ''; 
-                document.getElementById('history-list').prepend(Object.assign(document.createElement('li'), {innerText: text}));
-                clearCanvas(); inputField.placeholder = "+ 继续输入新的起点...";
-                const newNodeId = createNode(text, "...", window.innerWidth/2, window.innerHeight/2, true, '#1a1a1a', true);
-                renderNodes();
-                try {
-                    const trans = await callGeminiAPI(`Translate "${text}" to English concisely. Reply JSON: {"zh":"${text}","en":"trans"}`, true);
-                    nodes.find(n=>n.id===newNodeId).en = trans.en; renderNodes();
-                } catch (e) {}
-            }
+      document.getElementById('collection-panel').style.display = 'none';
+      showLoading('正在为您编织创意企划，请稍候...', true);
+      overlay.style.display = 'block';
+
+      const prompt = `我正在头脑风暴，挑选了核心词：【${Array.from(collectedWords).join('、')}】。请写一份结构完整的《创意企划概念案》，包含：\n1. 方案命名\n2. 核心概念\n3. 灵感串联解析\n4. 落地应用场景\n直接输出排版清晰的文章。`;
+
+      try {
+        document.getElementById('doc-content').innerText = await callGeminiAPI(prompt, false);
+        documentModal.style.display = 'flex';
+      } catch (error) {
+        console.error(error);
+        alert(`文档生成失败：${error.message}`);
+        overlay.style.display = 'none';
+      } finally {
+        showLoading('', false);
+      }
+    }
+
+    function closeDocumentModal() {
+      documentModal.style.display = 'none';
+      overlay.style.display = 'none';
+    }
+
+    async function copyDocument() {
+      const text = document.getElementById('doc-content').innerText;
+      try {
+        await navigator.clipboard.writeText(text);
+        alert('✅ 已复制到剪贴板！');
+      } catch {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          alert('✅ 已复制到剪贴板！');
+        } catch {
+          alert('复制失败，请手动选中复制。');
         }
+        document.body.removeChild(textArea);
+      }
+    }
 
-        async function onNodeClick(nodeId, text) {
-            if(!getApiKey()) { document.getElementById('settings-btn').click(); return; }
-            showLoading("思维发散中...", true);
-            try {
-                const relatedWords = await callGeminiAPI(`你是一个思维发散引擎。请针对“${text}”发散出6个具象且有创意的关联词汇。返回严格JSON数组：[{"zh":"中文","en":"English"}]`, true);
-                const parentNode = nodes.find(n => n.id === nodeId);
-                const radius = 180; const angleStep = (2 * Math.PI) / relatedWords.length; let currentAngle = Math.random() * Math.PI; 
-                relatedWords.forEach((wordObj) => {
-                    const childX = parentNode.x + radius * Math.cos(currentAngle); const childY = parentNode.y + radius * Math.sin(currentAngle);
-                    const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
-                    const childId = createNode(wordObj.zh, wordObj.en, childX, childY, false, randomColor, false);
-                    createLink(nodeId, childId); currentAngle += angleStep;
-                });
-                renderLinks(); renderNodes();
-            } catch (error) { 
-                console.error(error); 
-            } finally { 
-                showLoading("", false); 
-            }
-        }
+    document.getElementById('settings-btn').onclick = openSettings;
+    document.getElementById('save-api-btn').onclick = saveApiKey;
+    document.getElementById('history-btn').onclick = toggleHistoryPanel;
+    document.getElementById('collection-btn').onclick = toggleCollectionPanel;
+    document.getElementById('scale-in').onclick = () => scaleGraph(1.1);
+    document.getElementById('scale-out').onclick = () => scaleGraph(0.9);
+    document.getElementById('input-wand').onclick = trigger发散;
+    document.getElementById('generate-doc-btn').onclick = generateDocument;
+    document.getElementById('close-doc-btn').onclick = closeDocumentModal;
+    document.getElementById('copy-doc-btn').onclick = copyDocument;
+    inputField.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') trigger发散();
+    });
+    overlay.addEventListener('click', () => {
+      document.getElementById('settings-modal').style.display = 'none';
+      closeDocumentModal();
+    });
 
-        // ================= UI 与 收集逻辑 =================
-        function updateCollectionUI() {
-            document.getElementById('collection-badge').innerText = collectedWords.size;
-            const list = document.getElementById('collection-list');
-            if (collectedWords.size === 0) {
-                list.innerHTML = '<p style="font-size:12px; color:#888; margin: 10px 0;">右键点击画布上的任意词语即可收集。</p>';
-            } else {
-                list.innerHTML = ''; 
-                collectedWords.forEach(w => list.appendChild(Object.assign(document.createElement('li'), {innerText: w})));
-            }
-        }
+    document.addEventListener('mousedown', (e) => {
+      const nodeEl = e.target.closest('.mind-node');
+      if (!nodeEl) return;
+      isDragging = true;
+      dragMoved = false;
+      draggedNode = nodeEl;
+      startX = e.clientX;
+      startY = e.clientY;
+      draggedNode.dataset.initX = parseFloat(draggedNode.style.left);
+      draggedNode.dataset.initY = parseFloat(draggedNode.style.top);
+      draggedNode.classList.add('dragging');
+    });
 
-        function onNodeRightClick(e, nodeId) {
-            e.preventDefault(); 
-            const node = nodes.find(n => n.id === nodeId);
-            if (!node) return; 
-            
-            if (collectedWords.has(node.zh)) collectedWords.delete(node.zh); 
-            else collectedWords.add(node.zh);
-            
-            updateCollectionUI();
-            renderNodes();
-        }
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging || !draggedNode) return;
+      const dx = (e.clientX - startX) / currentScale;
+      const dy = (e.clientY - startY) / currentScale;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
 
-        // ================= 一键生成文档 =================
-        document.getElementById('generate-doc-btn').onclick = async () => {
-            if (collectedWords.size === 0) { alert("请先右键高亮一些灵感词汇！"); return; }
-            if (!getApiKey()) { document.getElementById('settings-btn').click(); return; }
-            document.getElementById('collection-panel').style.display = 'none';
-            showLoading("正在为您编织创意企划，请稍候...", true); overlay.style.display = 'block';
+      const newX = parseFloat(draggedNode.dataset.initX) + dx;
+      const newY = parseFloat(draggedNode.dataset.initY) + dy;
+      draggedNode.style.left = `${newX}px`;
+      draggedNode.style.top = `${newY}px`;
 
-            const prompt = `我正在头脑风暴，挑选了核心词：【${Array.from(collectedWords).join("、")}】。请写一份结构完整的《创意企划概念案》。包含：1.方案命名 2.核心概念 3.灵感串联解析 4.落地应用场景。直接输出排版清晰的文章。`;
-            try {
-                document.getElementById('doc-content').innerText = await callGeminiAPI(prompt, false);
-                document.getElementById('document-modal').style.display = 'flex';
-            } catch (err) { alert("生成失败，请刷新页面重试。"); overlay.style.display = 'none'; } finally { showLoading("", false); }
-        };
+      const nodeObj = nodes.find(n => n.id === parseInt(draggedNode.id.split('-')[1], 10));
+      if (nodeObj) {
+        nodeObj.x = newX;
+        nodeObj.y = newY;
+      }
 
-        function closeDocumentModal() { document.getElementById('document-modal').style.display = 'none'; overlay.style.display = 'none'; }
-        function copyDocument() { 
-            const text = document.getElementById('doc-content').innerText;
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => alert("✅ 已复制到剪贴板！"));
-            } else {
-                const textArea = document.createElement("textarea");
-                textArea.value = text; document.body.appendChild(textArea); textArea.select();
-                try { document.execCommand('copy'); alert("✅ 已复制到剪贴板！"); } catch (err) { alert("复制失败，请手动选中复制。"); }
-                document.body.removeChild(textArea);
-            }
-        }
+      renderLinks();
+    });
 
-        // ================= 渲染与逻辑 =================
-        function createNode(zhText, enText, x, y, isLarge, color, isCentral) {
-            const id = nodeIdCounter++; nodes.push({ id, zh: zhText, en: enText, x, y, isLarge, color, isCentral }); return id;
-        }
-        function createLink(sourceId, targetId) { links.push({ source: sourceId, target: targetId }); }
-        
-        function clearCanvas() { 
-            nodes = []; links = []; 
-            collectedWords.clear(); 
-            updateCollectionUI(); 
-            container.innerHTML = ''; svgCanvas.innerHTML = ''; 
-        }
-        
-        function showLoading(text, show) { statusIndicator.innerText = text; statusIndicator.style.display = show ? 'block' : 'none'; }
-
-        function renderNodes() {
-            nodes.forEach(node => {
-                let div = document.getElementById(`node-${node.id}`);
-                if (!div) {
-                    div = document.createElement('div'); div.id = `node-${node.id}`;
-                    div.innerHTML = `<span class="node-zh">${node.zh}</span><span class="node-en">${node.en}</span>`;
-                    div.addEventListener('click', (e) => { if(!isDragging) onNodeClick(node.id, node.zh); });
-                    div.addEventListener('contextmenu', (e) => onNodeRightClick(e, node.id));
-                    container.appendChild(div);
-                }
-                div.className = `mind-node ${node.isCentral ? 'central' : 'normal'}`;
-                if (collectedWords.has(node.zh)) { div.classList.add('collected'); div.style.backgroundColor = ''; div.style.border = ''; } 
-                else {
-                    div.classList.remove('collected');
-                    if (node.isCentral) { div.style.backgroundColor = node.color; div.style.border = 'none'; } 
-                    else { div.style.backgroundColor = '#fff'; div.style.border = `2px solid ${node.color}`; }
-                }
-                div.style.left = `${node.x}px`; div.style.top = `${node.y}px`;
-            });
-            renderLinks();
-        }
-
-        function renderLinks() {
-            svgCanvas.innerHTML = '';
-            links.forEach(link => {
-                const source = nodes.find(n => n.id === link.source); const target = nodes.find(n => n.id === link.target);
-                if (source && target) {
-                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                    line.setAttribute("x1", source.x); line.setAttribute("y1", source.y); line.setAttribute("x2", target.x); line.setAttribute("y2", target.y);
-                    line.setAttribute("class", "mind-edge"); svgCanvas.appendChild(line);
-                }
-            });
-        }
-
-        // ================= 智能双轨 API 引擎 =================
-        async function callGeminiAPI(prompt, expectJson) {
-            const key = getApiKey();
-            if (!key) throw new Error("API Key is missing");
-
-            // 智能判定：如果有系统环境变量(apiKey)，就在右侧面板使用限定模型；
-            // 如果是你的私人 Key，就使用最稳定的 1.5-flash
-            let modelName = apiKey ? "gemini-2.5-flash-preview-09-2025" : "gemini-1.5-flash";
-            let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
-            
-            const payload = { contents: [{ parts: [{ text: prompt }] }] };
-            
-            let response = await fetch(url, {
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(payload)
-            });
-
-            // 【终极降级保护】：如果你的私人账号报错 404 (不支持 1.5-flash)，后台静默降级到老版的 gemini-pro
-            if (response.status === 404 && !apiKey) {
-                console.warn("1.5-flash 请求失败，正在自动降级尝试 gemini-pro...");
-                modelName = "gemini-pro";
-                url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
-                response = await fetch(url, {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify(payload)
-                });
-            }
-
-            if (!response.ok) {
-                // 如果出现 401 报错（说明 Key 填错了）弹出设置面板
-                if (response.status === 401 || response.status === 403) {
-                    document.getElementById('settings-btn').click();
-                    alert("检测到 API Key 无效或未授权，请检查后重新填写！");
-                }
-                const errorData = await response.json().catch(()=>({}));
-                throw new Error(`API failed: ${response.status} ${errorData.error?.message || ''}`);
-            }
-            
-            const data = await response.json();
-            const textResp = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            
-            if (expectJson) {
-                const fence = String.fromCharCode(96, 96, 96); 
-                const cleanText = textResp.replace(new RegExp(fence + 'json', 'gi'), '').replace(new RegExp(fence, 'g'), '').trim();
-                try {
-                    return JSON.parse(cleanText);
-                } catch (parseError) {
-                    const match = textResp.match(/\[[\s\S]*\]/) || textResp.match(/\{[\s\S]*\}/);
-                    if (match) return JSON.parse(match[0]);
-                    throw parseError; 
-                }
-            }
-            return textResp;
-        }
-    </script>
+    document.addEventListener('mouseup', () => {
+      if (isDragging && draggedNode) {
+        draggedNode.classList.remove('dragging');
+      }
+      setTimeout(() => {
+        dragMoved = false;
+      }, 0);
+      draggedNode = null;
+      isDragging = false;
+    });
+  </script>
 </body>
 </html>
+
+```
