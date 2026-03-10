@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创意发散器 V2</title>
+    <title>创意发散器 V3</title>
     <style>
         /* ================= 视觉风格 ================= */
         :root {
@@ -26,7 +26,6 @@
             border: 1px solid var(--glass-border); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1); color: white;
         }
 
-        /* 历史记录面板 (右上角) */
         #history-panel {
             position: absolute; top: 20px; right: 20px; width: 200px; max-height: 300px;
             border-radius: 16px; padding: 15px; overflow-y: auto; z-index: 100;
@@ -35,7 +34,6 @@
         #history-list { list-style: none; padding: 0; margin: 0; font-size: 12px; }
         #history-list li { margin-bottom: 5px; opacity: 0.8; }
 
-        /* 设置按钮与面板 (左上角) */
         #settings-btn {
             position: absolute; top: 20px; left: 20px; padding: 10px 15px; border-radius: 12px;
             cursor: pointer; z-index: 100; font-size: 14px; border: none; font-weight: bold;
@@ -59,7 +57,6 @@
             background: rgba(255,255,255,0.7); backdrop-filter: blur(5px); z-index: 150;
         }
 
-        /* 底部胶囊输入框 */
         #input-wrapper {
             position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
             border-radius: 50px; padding: 5px 20px; display: flex; align-items: center; z-index: 100;
@@ -69,11 +66,9 @@
         }
         #main-input::placeholder { color: rgba(255,255,255,0.6); }
 
-        /* SVG 连线层 */
         #canvas-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         .line { stroke: #d0d0d0; stroke-width: 2; transition: stroke 0.3s; }
 
-        /* 节点层与样式 */
         #nodes-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
         .node {
             position: absolute; color: white; border-radius: 50%; display: flex; flex-direction: column;
@@ -89,10 +84,8 @@
         .node.large { width: 110px; height: 110px; }
         .node.large .node-zh { font-size: 18px; }
         .node.large .node-en { font-size: 12px; }
-
         .node.selected { border: 4px solid var(--accent-yellow); transform: translate(-50%, -50%) scale(1.1); }
 
-        /* 加载动画 */
         #loading-indicator {
             position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
             color: var(--node-black); font-size: 14px; font-weight: bold; display: none; z-index: 100;
@@ -111,7 +104,7 @@
     <div id="overlay"></div>
     <div id="settings-modal" class="glass">
         <h3 style="margin-top:0;">配置 Gemini API Key</h3>
-        <p style="font-size:12px; opacity:0.8; margin-bottom:5px;">Key 会保存在你的浏览器本地，不会上传</p>
+        <p style="font-size:12px; opacity:0.8; margin-bottom:5px;">Key 会保存在本地</p>
         <input type="password" id="api-key-input" placeholder="粘贴你的 API Key 到这里...">
         <button onclick="saveApiKey()">保存并关闭</button>
     </div>
@@ -125,10 +118,9 @@
         <input type="text" id="main-input" placeholder="输入灵感 (回车确认)..." autocomplete="off">
     </div>
 
-    <div id="loading-indicator">正在向 Gemini 获取灵感...</div>
+    <div id="loading-indicator">正在与 Gemini 连接思维...</div>
 
     <script>
-        // 色彩库：发散节点将从这里随机获取好看的颜色
         const colorPalette = [
             '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#D4A5A5', 
             '#9B59B6', '#3498DB', '#E67E22', '#2ECC71', '#F39C12',
@@ -154,32 +146,24 @@
 
         settingsBtn.onclick = () => {
             apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
-            settingsModal.style.display = 'block';
-            overlay.style.display = 'block';
+            settingsModal.style.display = 'block'; overlay.style.display = 'block';
         };
 
         function saveApiKey() {
             const key = apiKeyInput.value.trim();
             if(key) {
                 localStorage.setItem('gemini_api_key', key);
-                settingsModal.style.display = 'none';
-                overlay.style.display = 'none';
-            } else {
-                alert("API Key 不能为空哦");
-            }
+                settingsModal.style.display = 'none'; overlay.style.display = 'none';
+            } else { alert("API Key 不能为空"); }
         }
 
-        function getApiKey() {
-            return localStorage.getItem('gemini_api_key');
-        }
+        function getApiKey() { return localStorage.getItem('gemini_api_key'); }
 
         // ================= 核心交互 =================
         inputField.addEventListener('keypress', async (e) => {
             if (e.key === 'Enter' && inputField.value.trim() !== '') {
                 if(!getApiKey()) {
-                    alert("请先点击左上角设置 API Key 才能开始发散！");
-                    settingsBtn.click();
-                    return;
+                    alert("请先点击左上角设置 API Key！"); settingsBtn.click(); return;
                 }
                 const text = inputField.value.trim();
                 inputField.value = ''; 
@@ -187,181 +171,4 @@
             }
         });
 
-        async function handleNewInput(text) {
-            addHistory(text);
-            let parentId = null;
-            let startX = window.innerWidth / 2;
-            let startY = window.innerHeight / 2;
-
-            if (selectedNodeId !== null) {
-                parentId = selectedNodeId;
-                const parentNode = nodes.find(n => n.id === parentId);
-                startX = parentNode.x + (Math.random() * 100 - 50);
-                startY = parentNode.y + 160; 
-            } else {
-                clearCanvas();
-            }
-
-            // 中心词固定为黑色
-            const newNodeId = createNode(text, "Translating...", startX, startY, true, '#1a1a1a');
-            if (parentId !== null) createLink(parentId, newNodeId);
-            render();
-
-            try {
-                const trans = await callGeminiForTranslation(text);
-                updateNodeTranslation(newNodeId, trans.en);
-            } catch (e) {
-                updateNodeTranslation(newNodeId, text); 
-            }
-        }
-
-        async function onNodeClick(nodeId, text) {
-            if(!getApiKey()) { alert("请先设置 API Key"); return; }
-            if(document.getElementById(`node-${nodeId}`).classList.contains('expanding')) return; 
-            
-            showLoading(true);
-            try {
-                const relatedWords = await callGeminiForIdeas(text);
-                const parentNode = nodes.find(n => n.id === nodeId);
-                const radius = window.innerWidth < 768 ? 140 : 200; // 适配移动端半径
-                const angleStep = (2 * Math.PI) / relatedWords.length;
-                let currentAngle = Math.random() * Math.PI; 
-
-                relatedWords.forEach((wordObj) => {
-                    const childX = parentNode.x + radius * Math.cos(currentAngle);
-                    const childY = parentNode.y + radius * Math.sin(currentAngle);
-                    // 为新节点分配随机颜色
-                    const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
-                    
-                    const childId = createNode(wordObj.zh, wordObj.en, childX, childY, false, randomColor);
-                    createLink(nodeId, childId);
-                    currentAngle += angleStep;
-                });
-                render();
-            } catch (error) {
-                console.error(error);
-                alert("生成失败，请检查 API Key 是否正确填写，或者网络是否通畅。");
-            } finally {
-                showLoading(false);
-            }
-        }
-
-        function onNodeRightClick(e, nodeId) {
-            e.preventDefault();
-            selectedNodeId = selectedNodeId === nodeId ? null : nodeId;
-            renderSelection();
-        }
-
-        // ================= 数据与 DOM =================
-        function createNode(zhText, enText, x, y, isLarge, color) {
-            const id = nodeIdCounter++;
-            nodes.push({ id, zh: zhText, en: enText, x, y, isLarge, color });
-            return id;
-        }
-
-        function createLink(sourceId, targetId) { links.push({ source: sourceId, target: targetId }); }
-
-        function updateNodeTranslation(id, enText) {
-            const node = nodes.find(n => n.id === id);
-            if(node) {
-                node.en = enText;
-                const domNode = document.getElementById(`node-${id}`);
-                if(domNode) domNode.querySelector('.node-en').innerText = enText;
-            }
-        }
-
-        function clearCanvas() { nodes = []; links = []; selectedNodeId = null; container.innerHTML = ''; svgCanvas.innerHTML = ''; }
-
-        function render() {
-            svgCanvas.innerHTML = '';
-            links.forEach(link => {
-                const source = nodes.find(n => n.id === link.source);
-                const target = nodes.find(n => n.id === link.target);
-                if (source && target) {
-                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                    line.setAttribute("x1", source.x); line.setAttribute("y1", source.y);
-                    line.setAttribute("x2", target.x); line.setAttribute("y2", target.y);
-                    line.setAttribute("class", "line"); svgCanvas.appendChild(line);
-                }
-            });
-
-            nodes.forEach(node => {
-                let div = document.getElementById(`node-${node.id}`);
-                if (!div) {
-                    div = document.createElement('div');
-                    div.id = `node-${node.id}`;
-                    div.className = `node ${node.isLarge ? 'large' : 'normal'}`;
-                    div.style.backgroundColor = node.color; // 应用动态颜色
-                    
-                    div.innerHTML = `<span class="node-zh">${node.zh}</span><span class="node-en">${node.en}</span>`;
-                    
-                    div.addEventListener('click', () => onNodeClick(node.id, node.zh));
-                    div.addEventListener('contextmenu', (e) => onNodeRightClick(e, node.id));
-                    container.appendChild(div);
-                }
-                div.style.left = `${node.x}px`; div.style.top = `${node.y}px`;
-            });
-            renderSelection();
-        }
-
-        function renderSelection() {
-            document.querySelectorAll('.node').forEach(el => el.classList.remove('selected', 'large'));
-            nodes.forEach(node => {
-                const el = document.getElementById(`node-${node.id}`);
-                if (node.isLarge || node.id === selectedNodeId) el.classList.add('large');
-                if (node.id === selectedNodeId) el.classList.add('selected');
-            });
-        }
-
-        function addHistory(text) {
-            const li = document.createElement('li'); li.innerText = `> ${text}`; historyList.prepend(li);
-        }
-
-        function showLoading(show) { loadingIndicator.style.display = show ? 'block' : 'none'; }
-
-        // ================= API 对接 =================
-        async function callGeminiForTranslation(word) {
-            const prompt = `Translate the word "${word}" to English concisely. Reply with ONLY a JSON format like: {"zh": "${word}", "en": "translation"}`;
-            return await fetchGemini(prompt);
-        }
-
-        async function callGeminiForIdeas(word) {
-            const prompt = `你是一个思维发散引擎。请针对词语“${word}”发散出7到8个极具创意和深度的关联词汇。
-            要求：
-            1. 词汇必须严格与“${word}”存在逻辑、隐喻或结构关联。
-            2. 不要使用套话，要精准且有想象力。
-            3. 返回严格的 JSON 数组格式，不要包含任何 Markdown 标记(如 \`\`\`json 等)，结构如下：
-            [
-              {"zh": "关联词1", "en": "English 1"},
-              {"zh": "关联词2", "en": "English 2"}
-            ]`;
-            return await fetchGemini(prompt);
-        }
-
-       async function fetchGemini(prompt) {
-            const apiKey = getApiKey();
-            // 核心修改：使用 v1 正式版接口，并调用最新的 gemini-2.5-flash
-            const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-            
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-            });
-            
-            // 如果请求失败，把错误详细信息打印出来
-            if(!response.ok) {
-                const errData = await response.json();
-                console.error("Google API 报错详情:", errData);
-                alert("请求失败，请按 F12 打开控制台(Console)查看具体的红色报错信息。");
-                throw new Error("API 请求失败");
-            }
-            
-            const data = await response.json();
-            const textResp = data.candidates[0].content.parts[0].text;
-            const cleanJson = textResp.replace(/```json/g, '').replace(/```/g, '').trim();
-            return JSON.parse(cleanJson);
-        }
-    </script>
-</body>
-</html>
+        async function handleNewInput(
