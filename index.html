@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创意发散器 V5.1 (终极稳定版)</title>
+    <title>创意发散器 V5.2 (纯净去重版)</title>
     <style>
         /* ================= 视觉与布局 ================= */
         :root {
@@ -306,7 +306,7 @@
         function onNodeRightClick(e, nodeId) {
             e.preventDefault(); 
             const node = nodes.find(n => n.id === nodeId);
-            if (!node) return; // 安全检查，防止报错
+            if (!node) return; 
             
             if (collectedWords.has(node.zh)) collectedWords.delete(node.zh); 
             else collectedWords.add(node.zh);
@@ -351,7 +351,7 @@
         function clearCanvas() { 
             nodes = []; links = []; 
             collectedWords.clear(); 
-            updateCollectionUI(); // 安全地更新UI，不再模拟假点击
+            updateCollectionUI(); 
             container.innerHTML = ''; svgCanvas.innerHTML = ''; 
         }
         
