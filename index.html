@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创意发散器 V9 (终极合规版)</title>
+    <title>创意发散器 V9</title>
     <style>
         /* ================= 视觉与布局 ================= */
         :root {
@@ -99,7 +99,7 @@
         }
         @keyframes breathe { 0% { opacity: 0.6; } 100% { opacity: 1; } }
 
-        /* ================= 优雅的消息弹窗 (替代原生的 alert) ================= */
+        /* ================= 优雅的消息弹窗 ================= */
         #toast-message {
             position: fixed; top: 30px; left: 50%; transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.85); color: #fff; padding: 12px 24px; border-radius: 30px;
@@ -208,7 +208,7 @@
         const overlay = document.getElementById('overlay');
         const toastMessage = document.getElementById('toast-message');
 
-        // ================= 全新：安全消息提示框 (彻底取代 alert) =================
+        // ================= 全新：安全消息提示框 =================
         let toastTimeout;
         function showToast(message, duration = 3000) {
             clearTimeout(toastTimeout);
@@ -377,7 +377,7 @@
 
         function closeDocumentModal() { document.getElementById('document-modal').style.display = 'none'; overlay.style.display = 'none'; }
         
-        // 兼容 iFrame 限制的安全剪贴板复制
+        // 兼容限制的安全剪贴板复制
         function copyDocument() { 
             const text = document.getElementById('doc-content').innerText;
             const textArea = document.createElement("textarea");
@@ -449,7 +449,7 @@
         async function callGeminiAPI(prompt, expectJson) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             const payload = { contents: [{ parts: [{ text: prompt }] }] };
-            const delays = [1000, 2000, 4000, 8000, 16000]; // 规范要求的指数级重试
+            const delays = [1000, 2000, 4000, 8000, 16000]; 
             
             for (let i = 0; i < delays.length; i++) {
                 try {
