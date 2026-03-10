@@ -68,7 +68,8 @@
             position: absolute; border-radius: 50%; display: flex; flex-direction: column;
             justify-content: center; align-items: center; transform: translate(-50%, -50%);
             cursor: grab; text-align: center; padding: 10px; word-wrap: break-word;
-            transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Q弹动画 */
+            /* 核心修复：移除 transition: all，绝对禁止过渡 left/top，保证联动组队拖拽完美零延迟 */
+            transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s; 
             animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
 
