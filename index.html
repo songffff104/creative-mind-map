@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>创意发散器</title>
+    <style>
+        /* ================= 视觉风格 ================= */
+        :root {
+            --bg-color: #ffffff;
+            --node-black: #1a1a1a;
+            --accent-yellow: #FFD700;
+            --glass-bg: rgba(26, 26, 26, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* 防止滚动 */
+        }
+
+        /* 玻璃质感通用类 */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+            color: white;
+        }
+
+        /* 历史记录面板 (右上角) */
+        #history-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            max-height: 300px;
+            border-radius: 16px;
+            padding: 15px;
+            overflow-y: auto;
+            z-index: 100;
+        }
+        #history-panel h3 { margin: 0 0 10px 0; font-size: 14px; color: var(--accent-yellow); }
+        #history-list { list-style: none; padding: 0; margin: 0; font-size: 12px; }
+        #history-list li { margin-bottom: 5px; opacity: 0.8; }
+
+        /* 底部胶囊输入框 */
+        #input-wrapper {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 50px;
+            padding: 5px 20px;
+            display: flex;
+            align-items: center;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        #main-input {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            outline: none;
+            width: 300px;
+            padding: 10px;
+        }
+        #main-input::placeholder { color: rgba(255,255,255,0.6); }
+
+        /* SVG 连线层 */
+        #canvas-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        .line { stroke: #e0e0e0; stroke-width: 2; transition: stroke 0.3s; }
+
+        /* 节点层 */
+        #nodes-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+
+        /* 节点样式 */
+        .node {
+            position: absolute;
+            background-color: var(--node-black);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transform: translate(-50%, -50%); /* 居中对齐坐标 */
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+            text-align: center;
+            padding: 10px;
+            word-wrap: break-word;
+        }
+        .node:hover { transform: translate(-50%, -50%) scale(1.05); }
+        
+        .node-zh { font-weight: bold; font-size: 14px; line-height: 1.2; }
+        .node-en { font-size: 10px; opacity: 0.7; margin-top: 4px; line-height: 1.1; }
+
+        /* 状态样式：大小区分 */
+        .node.normal { width: 80px; height: 80px; }
+        .node.large { width: 110px; height: 110px; }
+        .node.large .node-zh { font-size: 18px; }
+        .node.large .node-en { font-size: 12px; }
+
+        /* 状态样式：选中 */
+        .node.selected {
+            background-color: var(--accent-yellow);
+            color: var(--node-black);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+        }
+
+        /* 加载动画 (呼吸线) */
+        #loading-indicator {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--node-black);
+            font-size: 14px;
+            font-weight: bold;
+            display: none;
+            z-index: 100;
+        }
+        .breathing {
+            animation: breathe 1.5s infinite ease-in-out alternate;
+        }
+        @keyframes breathe {
+            0% { opacity: 0.3; text-shadow: 0 0 5px var(--accent-yellow); }
+            100% { opacity: 1; text-shadow: 0 0 15px var(--accent-yellow); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <svg id="canvas-svg"></svg>
+    <div id="nodes-container"></div>
+
+    <div id="history-panel" class="glass">
+        <h3>历史记录</h3>
+        <ul id="history-list"></ul>
+    </div>
+
+    <div id="input-wrapper" class="glass">
+        <input type="text" id="main-input" placeholder="输入灵感 (回车确认)..." autocomplete="off">
+    </div>
+
+    <div id="loading-indicator" class="breathing">正在通过 Gemini 发散思维...</div>
+
+    <script>
+        // ================= 配置区 =================
+        // 请在此处填入你的 Gemini API Key
+        const GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY'; 
+        
+        // ================= 状态管理 =================
+        let nodes = [];
+        let links = [];
+        let selectedNodeId = null;
+        let nodeIdCounter = 0;
+
+        const container = document.getElementById('nodes-container');
+        const svgCanvas = document.getElementById('canvas-svg');
+        const inputField = document.getElementById('main-input');
+        const historyList = document.getElementById('history-list');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        // ================= 核心交互逻辑 =================
+
+        // 监听输入框回车事件
+        inputField.addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter' && inputField.value.trim() !== '') {
+                const text = inputField.value.trim();
+                inputField.value = ''; // 清空输入框
+                
+                await handleNewInput(text);
+            }
+        });
+
+        async function handleNewInput(text) {
+            addHistory(text);
+
+            // 决定新节点的位置和连接关系
+            let parentId = null;
+            let startX = window.innerWidth / 2;
+            let startY = window.innerHeight / 2;
+
+            if (selectedNodeId !== null) {
+                // 如果有选中词，作为新词的父节点
+                parentId = selectedNodeId;
+                const parentNode = nodes.find(n => n.id === parentId);
+                // 在选中节点附近生成
+                startX = parentNode.x + (Math.random() * 100 - 50);
+                startY = parentNode.y + 150; 
+            } else {
+                // 如果没有选中词，清空画布，作为新的绝对中心词
+                clearCanvas();
+            }
+
+            // 获取英文翻译 (直接创建一个节点，先不阻塞UI)
+            const newNodeId = createNode(text, "Translating...", startX, startY, true);
+            if (parentId !== null) {
+                createLink(parentId, newNodeId);
+            }
+
+            // 翻译一下中心词
+            try {
+                const trans = await callGeminiForTranslation(text);
+                updateNodeTranslation(newNodeId, trans.en);
+            } catch (e) {
+                updateNodeTranslation(newNodeId, text); // 失败兜底
+            }
+            
+            render();
+        }
+
+        // 节点点击事件：发散下一级
+        async function onNodeClick(nodeId, text) {
+            if(document.getElementById(`node-${nodeId}`).classList.contains('expanding')) return; // 防止重复点击
+            
+            showLoading(true);
+            try {
+                // 调用 Gemini API
+                const relatedWords = await callGeminiForIdeas(text);
+                
+                // 计算辐射状坐标展开
+                const parentNode = nodes.find(n => n.id === nodeId);
+                const radius = 180; // 辐射半径
+                const angleStep = (2 * Math.PI) / relatedWords.length;
+                let currentAngle = Math.random() * Math.PI; // 随机起始角度
+
+                relatedWords.forEach((wordObj, index) => {
+                    const childX = parentNode.x + radius * Math.cos(currentAngle);
+                    const childY = parentNode.y + radius * Math.sin(currentAngle);
+                    
+                    const childId = createNode(wordObj.zh, wordObj.en, childX, childY, false);
+                    createLink(nodeId, childId);
+                    
+                    currentAngle += angleStep;
+                });
+
+                render();
+            } catch (error) {
+                console.error("生成失败:", error);
+                alert("生成关联词失败，请检查网络或 API Key");
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 节点右键事件：选中/取消选中
+        function onNodeRightClick(e, nodeId) {
+            e.preventDefault(); // 阻止浏览器默认右键菜单
+            
+            if (selectedNodeId === nodeId) {
+                // 取消选中
+                selectedNodeId = null;
+            } else {
+                // 选中新节点
+                selectedNodeId = nodeId;
+            }
+            renderSelection();
+        }
+
+
+        // ================= 数据与 DOM 操作 =================
+
+        function createNode(zhText, enText, x, y, isLarge) {
+            const id = nodeIdCounter++;
+            nodes.push({ id, zh: zhText, en: enText, x, y, isLarge });
+            return id;
+        }
+
+        function createLink(sourceId, targetId) {
+            links.push({ source: sourceId, target: targetId });
+        }
+
+        function updateNodeTranslation(id, enText) {
+            const node = nodes.find(n => n.id === id);
+            if(node) {
+                node.en = enText;
+                const domNode = document.getElementById(`node-${id}`);
+                if(domNode) domNode.querySelector('.node-en').innerText = enText;
+            }
+        }
+
+        function clearCanvas() {
+            nodes = [];
+            links = [];
+            selectedNodeId = null;
+            container.innerHTML = '';
+            svgCanvas.innerHTML = '';
+        }
+
+        function render() {
+            // 渲染连线
+            svgCanvas.innerHTML = '';
+            links.forEach(link => {
+                const source = nodes.find(n => n.id === link.source);
+                const target = nodes.find(n => n.id === link.target);
+                if (source && target) {
+                    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    line.setAttribute("x1", source.x);
+                    line.setAttribute("y1", source.y);
+                    line.setAttribute("x2", target.x);
+                    line.setAttribute("y2", target.y);
+                    line.setAttribute("class", "line");
+                    svgCanvas.appendChild(line);
+                }
+            });
+
+            // 渲染节点
+            nodes.forEach(node => {
+                let div = document.getElementById(`node-${node.id}`);
+                if (!div) {
+                    div = document.createElement('div');
+                    div.id = `node-${node.id}`;
+                    div.className = `node ${node.isLarge ? 'large' : 'normal'}`;
+                    
+                    const zhSpan = document.createElement('span');
+                    zhSpan.className = 'node-zh';
+                    zhSpan.innerText = node.zh;
+                    
+                    const enSpan = document.createElement('span');
+                    enSpan.className = 'node-en';
+                    enSpan.innerText = node.en;
+
+                    div.appendChild(zhSpan);
+                    div.appendChild(enSpan);
+
+                    // 绑定事件
+                    div.addEventListener('click', () => onNodeClick(node.id, node.zh));
+                    div.addEventListener('contextmenu', (e) => onNodeRightClick(e, node.id));
+
+                    container.appendChild(div);
+                }
+                
+                // 更新位置
+                div.style.left = `${node.x}px`;
+                div.style.top = `${node.y}px`;
+            });
+
+            renderSelection();
+        }
+
+        function renderSelection() {
+            document.querySelectorAll('.node').forEach(el => el.classList.remove('selected', 'large'));
+            
+            nodes.forEach(node => {
+                const el = document.getElementById(`node-${node.id}`);
+                if (node.isLarge || node.id === selectedNodeId) {
+                    el.classList.add('large'); // 初始词和选中词变大
+                }
+                if (node.id === selectedNodeId) {
+                    el.classList.add('selected');
+                }
+            });
+        }
+
+        function addHistory(text) {
+            const li = document.createElement('li');
+            li.innerText = `> ${text}`;
+            historyList.prepend(li);
+        }
+
+        function showLoading(show) {
+            loadingIndicator.style.display = show ? 'block' : 'none';
+        }
+
+        // ================= Gemini API 对接逻辑 =================
+        
+        // 简单翻译中心词
+        async function callGeminiForTranslation(word) {
+            if (GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') return { zh: word, en: "English" };
+
+            const prompt = `Translate the word "${word}" to English. Reply with ONLY a JSON format like: {"zh": "${word}", "en": "translation"}`;
+            return await fetchGemini(prompt);
+        }
+
+        // 生成发散词
+        async function callGeminiForIdeas(word) {
+            // 如果没填 key，提供 mock 数据方便测试 UI
+            if (GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY') {
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        resolve([
+                            {zh: "色彩", en: "Color"}, {zh: "光影", en: "Light/Shadow"}, 
+                            {zh: "结构", en: "Structure"}, {zh: "质感", en: "Texture"},
+                            {zh: "情绪", en: "Emotion"}, {zh: "声音", en: "Sound"}, 
+                            {zh: "时间", en: "Time"}
+                        ]);
+                    }, 1000);
+                });
+            }
+
+            const prompt = `你是一个创意思维导师。请针对词语“${word}”发散出7到8个极具创意和关联性的词汇。
+            要求返回严格的 JSON 数组格式，不要包含任何 Markdown 标记(如 \`\`\`json 等)，结构如下：
+            [
+              {"zh": "中文词1", "en": "English Translation 1"},
+              {"zh": "中文词2", "en": "English Translation 2"}
+            ]`;
+
+            return await fetchGemini(prompt);
+        }
+
+        async function fetchGemini(prompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+
+            const data = await response.json();
+            try {
+                const textResp = data.candidates[0].content.parts[0].text;
+                // 清理可能包含的 Markdown block 标记
+                const cleanJson = textResp.replace(/```json/g, '').replace(/```/g, '').trim();
+                return JSON.parse(cleanJson);
+            } catch (e) {
+                console.error("解析 API 返回内容失败:", data);
+                throw e;
+            }
+        }
+
+    </script>
+</body>
+</html>
