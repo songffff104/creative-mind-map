@@ -126,11 +126,13 @@
 </head>
 <body>
 
+    <!-- 画布区 -->
     <div id="zoom-container">
         <svg id="canvas-svg"></svg>
         <div id="nodes-container"></div>
     </div>
 
+    <!-- UI 交互区 (防遮挡设计) -->
     <div id="ui-layer">
         <div id="status-indicator" class="pointer-auto">星系运转中...</div>
         
@@ -152,6 +154,7 @@
         </div>
     </div>
 
+    <!-- 弹窗遮罩与面板 -->
     <div id="overlay"></div>
     
     <div id="settings-modal" class="glass panel">
@@ -206,7 +209,10 @@
             if(key) { localStorage.setItem('gemini_api_key', key); document.getElementById('settings-modal').style.display = 'none'; overlay.style.display = 'none'; } 
             else { alert("API Key 不能为空"); }
         }
-        function getApiKey() { return localStorage.getItem('gemini_api_key'); }
+        function getApiKey() { 
+            // 兼容本地部署和在线预览：优先取用户填写的key，如果没有则尝试获取全局环境变量注入的空key
+            return localStorage.getItem('gemini_api_key') || (typeof apiKey !== 'undefined' ? apiKey : ""); 
+        }
 
         // ================= 面板与缩放 =================
         document.getElementById('history-btn').onclick = () => {
@@ -312,7 +318,22 @@
         };
 
         function closeDocumentModal() { document.getElementById('document-modal').style.display = 'none'; overlay.style.display = 'none'; }
-        function copyDocument() { navigator.clipboard.writeText(document.getElementById('doc-content').innerText).then(() => alert("✅ 已复制到剪贴板！")); }
+        function copyDocument() { 
+            // 使用新版剪贴板 API 兼容 iFrame 和各种浏览器环境
+            const text = document.getElementById('doc-content').innerText;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => alert("✅ 已复制到剪贴板！"));
+            } else {
+                // 降级方案
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try { document.execCommand('copy'); alert("✅ 已复制到剪贴板！"); } 
+                catch (err) { alert("复制失败，请手动选中复制。"); }
+                document.body.removeChild(textArea);
+            }
+        }
 
         // ================= 渲染与 API =================
         function createNode(zhText, enText, x, y, isLarge, color, isCentral) {
@@ -364,8 +385,3 @@
             if(!response.ok) throw new Error("API failed");
             const textResp = (await response.json()).candidates[0].content.parts[0].text;
             return expectJson ? JSON.parse(textResp.replace(/
-        }
-  }
-    </script>
-</body>
-</html>
