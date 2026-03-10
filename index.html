@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创意发散器 V7 (全平台智能版)</title>
+    <title>独属于你的创意发散器 </title>
     <style>
         /* ================= 视觉与布局 ================= */
         :root {
@@ -196,6 +196,12 @@
 
         let nodes = []; let links = []; let collectedWords = new Set();
         let nodeIdCounter = 0; let currentScale = 1;
+        
+        // 【核心修复】引入 dragMoved 状态，精确区分“拖拽”与“点击”
+        let isDragging = false; 
+        let dragMoved = false; 
+        let draggedNode = null; 
+        let startX, startY;
 
         const container = document.getElementById('nodes-container');
         const zoomContainer = document.getElementById('zoom-container');
@@ -220,8 +226,7 @@
         }
 
         function getApiKey() { 
-            // 如果环境注入了 Key 就用环境的，否则读取你存在本地的私人 Key
-            return apiKey || localStorage.getItem('gemini_api_key') || ""; 
+            return localStorage.getItem('gemini_api_key') || apiKey || ""; 
         }
 
         // ================= 面板与缩放 =================
@@ -240,30 +245,49 @@
             zoomContainer.style.transform = `scale(${currentScale})`;
         }
 
-        // ================= 完美拖拽逻辑 =================
-        let isDragging = false; let draggedNode = null; let startX, startY;
+        // ================= 完美拖拽逻辑 (GPT 修复版) =================
         document.addEventListener('mousedown', (e) => {
             const nodeEl = e.target.closest('.mind-node');
             if (nodeEl) {
-                isDragging = true; draggedNode = nodeEl;
-                startX = e.clientX; startY = e.clientY;
+                isDragging = true; 
+                dragMoved = false; // 按下时初始化为未移动
+                draggedNode = nodeEl;
+                startX = e.clientX; 
+                startY = e.clientY;
                 draggedNode.dataset.initX = parseFloat(draggedNode.style.left);
                 draggedNode.dataset.initY = parseFloat(draggedNode.style.top);
                 draggedNode.classList.add('dragging');
             }
         });
+        
         document.addEventListener('mousemove', (e) => {
-            if (isDragging && draggedNode) {
-                const dx = (e.clientX - startX) / currentScale; const dy = (e.clientY - startY) / currentScale;
-                const newX = parseFloat(draggedNode.dataset.initX) + dx; const newY = parseFloat(draggedNode.dataset.initY) + dy;
-                draggedNode.style.left = `${newX}px`; draggedNode.style.top = `${newY}px`;
-                const nodeObj = nodes.find(n => n.id === parseInt(draggedNode.id.split('-')[1]));
-                if(nodeObj) { nodeObj.x = newX; nodeObj.y = newY; }
-                renderLinks();
+            if (!isDragging || !draggedNode) return;
+            const dx = (e.clientX - startX) / currentScale; 
+            const dy = (e.clientY - startY) / currentScale;
+            
+            // 只要移动距离超过3像素，就标记为正在拖拽
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                dragMoved = true;
             }
+
+            const newX = parseFloat(draggedNode.dataset.initX) + dx; 
+            const newY = parseFloat(draggedNode.dataset.initY) + dy;
+            draggedNode.style.left = `${newX}px`; 
+            draggedNode.style.top = `${newY}px`;
+            
+            const nodeObj = nodes.find(n => n.id === parseInt(draggedNode.id.split('-')[1], 10));
+            if(nodeObj) { nodeObj.x = newX; nodeObj.y = newY; }
+            renderLinks();
         });
+        
         document.addEventListener('mouseup', () => {
-            if (isDragging && draggedNode) { draggedNode.classList.remove('dragging'); draggedNode = null; isDragging = false; }
+            if (isDragging && draggedNode) { 
+                draggedNode.classList.remove('dragging'); 
+                draggedNode = null; 
+                isDragging = false; 
+                // 延迟清理 dragMoved 状态，以便 click 事件能读取到
+                setTimeout(() => { dragMoved = false; }, 50);
+            }
         });
 
         // ================= 核心发散交互 =================
@@ -272,7 +296,6 @@
 
         async function trigger发散() {
             if (inputField.value.trim() !== '') {
-                // 如果是在你的网站上运行，且没填 Key，直接弹出设置
                 if(!getApiKey()) { 
                     document.getElementById('settings-btn').click(); 
                     return; 
@@ -291,6 +314,9 @@
         }
 
         async function onNodeClick(nodeId, text) {
+            // 如果处于拖拽状态，直接阻断点击发散
+            if (dragMoved) return; 
+
             if(!getApiKey()) { document.getElementById('settings-btn').click(); return; }
             showLoading("思维发散中...", true);
             try {
@@ -325,6 +351,8 @@
 
         function onNodeRightClick(e, nodeId) {
             e.preventDefault(); 
+            if (dragMoved) return; 
+
             const node = nodes.find(n => n.id === nodeId);
             if (!node) return; 
             
@@ -383,7 +411,8 @@
                 if (!div) {
                     div = document.createElement('div'); div.id = `node-${node.id}`;
                     div.innerHTML = `<span class="node-zh">${node.zh}</span><span class="node-en">${node.en}</span>`;
-                    div.addEventListener('click', (e) => { if(!isDragging) onNodeClick(node.id, node.zh); });
+                    // 将 dragMoved 检测放进单独的方法中
+                    div.addEventListener('click', (e) => onNodeClick(node.id, node.zh));
                     div.addEventListener('contextmenu', (e) => onNodeRightClick(e, node.id));
                     container.appendChild(div);
                 }
@@ -414,11 +443,14 @@
         // ================= 智能双轨 API 引擎 =================
         async function callGeminiAPI(prompt, expectJson) {
             const key = getApiKey();
-            if (!key) throw new Error("API Key is missing");
+            if (!key) {
+                document.getElementById('settings-btn').click();
+                throw new Error("请先填写 API Key！");
+            }
 
-            // 智能判定：如果有系统环境变量(apiKey)，就在右侧面板使用限定模型；
-            // 如果是你的私人 Key，就使用最稳定的 1.5-flash
-            let modelName = apiKey ? "gemini-2.5-flash-preview-09-2025" : "gemini-1.5-flash";
+            // 根据 Key 的来源决定使用哪个模型，防止在你的网站上出现 404
+            const isCustomKey = !!localStorage.getItem('gemini_api_key');
+            let modelName = isCustomKey ? "gemini-1.5-flash" : "gemini-2.5-flash-preview-09-2025";
             let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
             
             const payload = { contents: [{ parts: [{ text: prompt }] }] };
@@ -429,23 +461,17 @@
                 body: JSON.stringify(payload)
             });
 
-            // 【终极降级保护】：如果你的私人账号报错 404 (不支持 1.5-flash)，后台静默降级到老版的 gemini-pro
-            if (response.status === 404 && !apiKey) {
-                console.warn("1.5-flash 请求失败，正在自动降级尝试 gemini-pro...");
-                modelName = "gemini-pro";
-                url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
-                response = await fetch(url, {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify(payload)
-                });
-            }
-
             if (!response.ok) {
-                // 如果出现 401 报错（说明 Key 填错了）弹出设置面板
+                // 当 API 报错 401/403 时，说明用户填的自定义 Key 已经失效，自动清除并提示
                 if (response.status === 401 || response.status === 403) {
-                    document.getElementById('settings-btn').click();
-                    alert("检测到 API Key 无效或未授权，请检查后重新填写！");
+                    if (isCustomKey) {
+                        localStorage.removeItem('gemini_api_key');
+                        document.getElementById('settings-btn').click();
+                        alert("API Key 无效或未授权，请检查后重新填写！");
+                    } else {
+                        document.getElementById('settings-btn').click();
+                        alert("环境验证失败，请在设置中填写您自己的 API Key。");
+                    }
                 }
                 const errorData = await response.json().catch(()=>({}));
                 throw new Error(`API failed: ${response.status} ${errorData.error?.message || ''}`);
