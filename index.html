@@ -364,3 +364,7 @@
             if(!response.ok) throw new Error("API failed");
             const textResp = (await response.json()).candidates[0].content.parts[0].text;
             return expectJson ? JSON.parse(textResp.replace(/
+}
+    </script>
+</body>
+</html>
