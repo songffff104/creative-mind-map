@@ -384,4 +384,13 @@
             });
             if(!response.ok) throw new Error("API failed");
             const textResp = (await response.json()).candidates[0].content.parts[0].text;
-            return expectJson ? JSON.parse(textResp.replace(/
+            
+            // 使用安全的方式过滤大模型的格式符号，防止代码块被意外截断
+            const fence = String.fromCharCode(96, 96, 96); 
+            const cleanText = textResp.replace(new RegExp(fence + 'json', 'g'), '').replace(new RegExp(fence, 'g'), '').trim();
+            
+            return expectJson ? JSON.parse(cleanText) : textResp;
+        }
+    </script>
+</body>
+</html>
