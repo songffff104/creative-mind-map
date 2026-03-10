@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创意发散器 V9</title>
+    <title>创意发散器 (自动探测模型版)</title>
     <style>
         /* ================= 视觉与布局 ================= */
         :root {
@@ -71,6 +71,7 @@
         }
         .glass-btn:hover { background: rgba(255,255,255,0.9); transform: translateY(-2px); }
         
+        #settings-btn { top: 20px; left: 20px; }
         #history-btn { top: 20px; right: 20px; }
         #collection-btn { top: 70px; right: 20px; width: auto; padding: 0 15px; gap: 8px; }
         #collection-badge { background: var(--accent-yellow); color: var(--text-dark); border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold;}
@@ -111,9 +112,11 @@
         #overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7); backdrop-filter: blur(5px); z-index: 150; pointer-events: auto; }
         .panel { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 25px; border-radius: 16px; z-index: 200; width: 300px; text-align: center; pointer-events: auto; }
         
+        #settings-modal { width: 320px; }
         #history-panel { top: 70px; right: 70px; left: auto; transform: none; width: 200px; max-height: 300px; overflow-y: auto; text-align: left; }
         #collection-panel { top: 120px; right: 20px; left: auto; transform: none; width: 240px; max-height: 400px; overflow-y: auto; text-align: left; }
         
+        .panel input { width: 90%; padding: 10px; margin: 15px 0; border-radius: 8px; border: 1px solid #ddd; outline: none; }
         .primary-btn { background: var(--accent-yellow); color: var(--text-dark); border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.3s; font-size: 14px;}
         .primary-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4); }
         .panel h3 { margin: 0 0 10px 0; font-size: 15px; color: #555; }
@@ -143,6 +146,7 @@
         <div id="status-indicator" class="pointer-auto">星系运转中...</div>
         <div id="toast-message"></div>
         
+        <button id="settings-btn" class="glass-btn pointer-auto">⚙️</button>
         <button id="history-btn" class="glass-btn pointer-auto">🕒</button>
         <button id="collection-btn" class="glass-btn pointer-auto">📥 <span id="collection-badge">0</span></button>
         
@@ -163,6 +167,13 @@
     <!-- 弹窗遮罩与面板 -->
     <div id="overlay"></div>
     
+    <div id="settings-modal" class="glass panel">
+        <h3 style="margin-top:0;">配置 Gemini API Key</h3>
+        <p style="font-size:12px; color:#888;">填写后系统将自动为您测试并分配可用模型</p>
+        <input type="password" id="api-key-input" placeholder="粘贴您的私人 API Key...">
+        <button class="primary-btn" onclick="saveApiKey()">保存并开始</button>
+    </div>
+
     <div id="history-panel" class="glass panel">
         <h3>🕒 历史起点</h3>
         <ul id="history-list" class="list-container"></ul>
@@ -186,13 +197,16 @@
     </div>
 
     <script>
-        // 环境专属全局 API Key
-        const apiKey = "";
+        // 环境全局代理变量 (针对内部测试环境预留)
+        const envApiKey = typeof apiKey !== 'undefined' ? apiKey : "";
         
         const colorPalette = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#BDE0FE', '#A2D2FF', '#FFE5D9'];
 
         let nodes = []; let links = []; let collectedWords = new Set();
         let nodeIdCounter = 0; let currentScale = 1;
+        
+        // 【核心状态】记录当前成功接通的模型，避免重复测试
+        let workingModel = null;
         
         // 精确区分“拖拽”与“点击”
         let isDragging = false; 
@@ -208,7 +222,7 @@
         const overlay = document.getElementById('overlay');
         const toastMessage = document.getElementById('toast-message');
 
-        // ================= 全新：安全消息提示框 =================
+        // ================= 安全消息提示框 =================
         let toastTimeout;
         function showToast(message, duration = 3000) {
             clearTimeout(toastTimeout);
@@ -220,6 +234,30 @@
                 toastMessage.style.opacity = '0';
                 setTimeout(() => toastMessage.style.display = 'none', 300);
             }, duration);
+        }
+
+        // ================= API Key 管理 =================
+        document.getElementById('settings-btn').onclick = () => {
+            document.getElementById('api-key-input').value = localStorage.getItem('gemini_api_key') || '';
+            document.getElementById('settings-modal').style.display = 'block'; 
+            overlay.style.display = 'block';
+        };
+        
+        function saveApiKey() {
+            const key = document.getElementById('api-key-input').value.trim();
+            if(key) { 
+                localStorage.setItem('gemini_api_key', key); 
+                workingModel = null; // Key 改变时重新触发模型探测
+                showToast("API Key 已保存，下次发散将自动测试模型");
+            } else { 
+                localStorage.removeItem('gemini_api_key'); 
+            }
+            document.getElementById('settings-modal').style.display = 'none'; 
+            overlay.style.display = 'none'; 
+        }
+
+        function getApiKey() { 
+            return localStorage.getItem('gemini_api_key') || envApiKey || ""; 
         }
 
         // ================= 面板与缩放 =================
@@ -297,6 +335,11 @@
 
         async function trigger发散() {
             if (inputField.value.trim() !== '') {
+                if(!getApiKey()) { 
+                    document.getElementById('settings-btn').click(); 
+                    return; 
+                }
+
                 const text = inputField.value.trim(); inputField.value = ''; 
                 document.getElementById('history-list').prepend(Object.assign(document.createElement('li'), {innerText: text}));
                 clearCanvas(); inputField.placeholder = "+ 继续输入新的起点...";
@@ -305,12 +348,16 @@
                 try {
                     const trans = await callGeminiAPI(`Translate "${text}" to English concisely. Reply JSON: {"zh":"${text}","en":"trans"}`, true);
                     nodes.find(n=>n.id===newNodeId).en = trans.en; renderNodes();
-                } catch (e) {}
+                } catch (e) {
+                    console.log("翻译请求忽略: ", e);
+                }
             }
         }
 
         async function onNodeClick(nodeId, text) {
             if (dragMoved) return; 
+            if(!getApiKey()) { document.getElementById('settings-btn').click(); return; }
+
             showLoading("思维发散中...", true);
             try {
                 const relatedWords = await callGeminiAPI(`你是一个思维发散引擎。请针对“${text}”发散出6个具象且有创意的关联词汇。返回严格JSON数组：[{"zh":"中文","en":"English"}]`, true);
@@ -325,7 +372,10 @@
                 });
                 renderLinks(); renderNodes();
             } catch (error) { 
-                showToast("网络拥堵或格式错误，请稍后重试！"); 
+                console.error(error);
+                if(error.message !== "Invalid_API_Key") {
+                    showToast("网络连接波动，请再次点击节点重试！"); 
+                }
             } finally { 
                 showLoading("", false); 
             }
@@ -360,6 +410,8 @@
         // ================= 一键生成文档 =================
         document.getElementById('generate-doc-btn').onclick = async () => {
             if (collectedWords.size === 0) { showToast("请先右键高亮一些灵感词汇！"); return; }
+            if (!getApiKey()) { document.getElementById('settings-btn').click(); return; }
+
             document.getElementById('collection-panel').style.display = 'none';
             showLoading("正在为您编织创意企划，请稍候...", true); overlay.style.display = 'block';
 
@@ -377,7 +429,6 @@
 
         function closeDocumentModal() { document.getElementById('document-modal').style.display = 'none'; overlay.style.display = 'none'; }
         
-        // 兼容限制的安全剪贴板复制
         function copyDocument() { 
             const text = document.getElementById('doc-content').innerText;
             const textArea = document.createElement("textarea");
@@ -445,13 +496,35 @@
             });
         }
 
-        // ================= 严格符合环境规范的 API 引擎 =================
+        // ================= 智能模型探测 API 引擎 =================
         async function callGeminiAPI(prompt, expectJson) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            const payload = { contents: [{ parts: [{ text: prompt }] }] };
-            const delays = [1000, 2000, 4000, 8000, 16000]; 
+            const key = getApiKey();
+            if (!key) throw new Error("API Key 缺失");
+
+            // 可选模型列表（按推荐优先级排列）
+            let modelsToTry = [];
             
-            for (let i = 0; i < delays.length; i++) {
+            if (workingModel) {
+                // 如果之前已经试成功过某个模型，以后都用它
+                modelsToTry = [workingModel];
+            } else {
+                // 如果是首次请求，按顺序全盘测试
+                modelsToTry = [
+                    "gemini-2.5-flash",
+                    "gemini-1.5-flash",
+                    "gemini-1.5-pro",
+                    "gemini-pro",
+                    "gemini-2.5-flash-preview-09-2025"
+                ];
+                showToast("正在自动探测可用模型，请稍候...", 4000);
+            }
+            
+            const payload = { contents: [{ parts: [{ text: prompt }] }] };
+            let lastError = null;
+            
+            for (const model of modelsToTry) {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+                
                 try {
                     const response = await fetch(url, {
                         method: 'POST', 
@@ -459,10 +532,32 @@
                         body: JSON.stringify(payload)
                     });
 
+                    // 如果遇到 404（模型找不到/不支持），直接捕获异常进入下一轮循环尝试新模型
+                    if (response.status === 404) {
+                        console.warn(`[探测] 模型 ${model} 不被当前 Key 支持，尝试下一个...`);
+                        continue; 
+                    }
+
+                    // 如果遇到权限问题，停止探测，弹窗提示
+                    if (response.status === 401 || response.status === 403) {
+                        localStorage.removeItem('gemini_api_key');
+                        document.getElementById('settings-btn').click();
+                        showToast("API Key 无效或未授权，请检查重新填写！", 4000);
+                        throw new Error("Invalid_API_Key");
+                    }
+
                     if (!response.ok) {
-                        throw new Error(`HTTP Error: ${response.status}`);
+                        const errorData = await response.json().catch(()=>({}));
+                        throw new Error(`HTTP ${response.status}: ${errorData.error?.message || ''}`);
                     }
                     
+                    // 【成功找到可用模型！】
+                    if (!workingModel) {
+                        workingModel = model; // 缓存可用模型
+                        console.log(`[探测成功] 已锁定可用模型: ${model}`);
+                        showToast(`已成功连接 AI 模型！`, 2000);
+                    }
+
                     const data = await response.json();
                     const textResp = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
                     
@@ -478,13 +573,19 @@
                         }
                     }
                     return textResp;
+
                 } catch (err) {
-                    if (i === delays.length - 1) {
-                        throw new Error("API completely failed after multiple retries.");
-                    }
-                    await new Promise(r => setTimeout(r, delays[i]));
+                    lastError = err;
+                    // 如果是 API Key 无效错误，跳出循环不再重试
+                    if (err.message === "Invalid_API_Key") break;
                 }
             }
+            
+            // 所有模型都遍历完了依然没有返回
+            if(lastError && lastError.message !== "Invalid_API_Key") {
+                throw lastError || new Error("所有可用模型均无法访问。");
+            }
+            throw new Error("请求被中断");
         }
     </script>
 </body>
