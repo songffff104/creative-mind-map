@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>独属于你的创意发散器 </title>
+    <title>创意发散器 V9 (终极合规版)</title>
     <style>
         /* ================= 视觉与布局 ================= */
         :root {
@@ -59,7 +59,7 @@
             border: 3px solid #fff !important; box-shadow: 0 0 20px rgba(255, 215, 0, 0.6) !important; 
         }
 
-        /* ================= UI 悬浮层 (不遮挡画布) ================= */
+        /* ================= UI 悬浮层 ================= */
         #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; }
         .pointer-auto { pointer-events: auto; }
 
@@ -71,7 +71,6 @@
         }
         .glass-btn:hover { background: rgba(255,255,255,0.9); transform: translateY(-2px); }
         
-        #settings-btn { top: 20px; left: 20px; }
         #history-btn { top: 20px; right: 20px; }
         #collection-btn { top: 70px; right: 20px; width: auto; padding: 0 15px; gap: 8px; }
         #collection-badge { background: var(--accent-yellow); color: var(--text-dark); border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold;}
@@ -100,15 +99,21 @@
         }
         @keyframes breathe { 0% { opacity: 0.6; } 100% { opacity: 1; } }
 
+        /* ================= 优雅的消息弹窗 (替代原生的 alert) ================= */
+        #toast-message {
+            position: fixed; top: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85); color: #fff; padding: 12px 24px; border-radius: 30px;
+            font-size: 14px; z-index: 9999; display: none; opacity: 0; transition: opacity 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); pointer-events: none; text-align: center;
+        }
+
         /* ================= 面板 ================= */
         #overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7); backdrop-filter: blur(5px); z-index: 150; pointer-events: auto; }
         .panel { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 25px; border-radius: 16px; z-index: 200; width: 300px; text-align: center; pointer-events: auto; }
         
-        #settings-modal { width: 320px; }
         #history-panel { top: 70px; right: 70px; left: auto; transform: none; width: 200px; max-height: 300px; overflow-y: auto; text-align: left; }
         #collection-panel { top: 120px; right: 20px; left: auto; transform: none; width: 240px; max-height: 400px; overflow-y: auto; text-align: left; }
         
-        .panel input { width: 90%; padding: 10px; margin: 15px 0; border-radius: 8px; border: 1px solid #ddd; outline: none; }
         .primary-btn { background: var(--accent-yellow); color: var(--text-dark); border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; transition: 0.3s; font-size: 14px;}
         .primary-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4); }
         .panel h3 { margin: 0 0 10px 0; font-size: 15px; color: #555; }
@@ -120,7 +125,7 @@
             width: clamp(300px, 80%, 700px); height: 70vh; padding: 30px; border-radius: 20px; z-index: 300;
             display: flex; flex-direction: column; gap: 15px; background: var(--bg-color); border: 1px solid var(--line-gray); box-shadow: 0 20px 50px rgba(0,0,0,0.15); pointer-events: auto;
         }
-        #doc-content { flex: 1; overflow-y: auto; font-size: 15px; line-height: 1.6; padding: 15px; background: #f9f9f9; border-radius: 10px; white-space: pre-wrap; color: var(--text-dark); }
+        #doc-content { flex: 1; overflow-y: auto; font-size: 15px; line-height: 1.6; padding: 15px; background: #f9f9f9; border-radius: 10px; white-space: pre-wrap; color: var(--text-dark); text-align: left;}
         .doc-actions { display: flex; gap: 10px; justify-content: flex-end; }
         .btn-outline { padding: 10px 15px; border-radius: 8px; border: 1px solid var(--line-gray); cursor: pointer; background: transparent; color: var(--text-dark); font-weight: bold; }
     </style>
@@ -136,8 +141,8 @@
     <!-- UI 交互区 -->
     <div id="ui-layer">
         <div id="status-indicator" class="pointer-auto">星系运转中...</div>
+        <div id="toast-message"></div>
         
-        <button id="settings-btn" class="glass-btn pointer-auto">⚙️</button>
         <button id="history-btn" class="glass-btn pointer-auto">🕒</button>
         <button id="collection-btn" class="glass-btn pointer-auto">📥 <span id="collection-badge">0</span></button>
         
@@ -158,14 +163,6 @@
     <!-- 弹窗遮罩与面板 -->
     <div id="overlay"></div>
     
-    <!-- 设置面板重磅回归 -->
-    <div id="settings-modal" class="glass panel">
-        <h3 style="margin-top:0;">配置 Gemini API Key</h3>
-        <p style="font-size:12px; color:#888;">如果你在自己的网站上运行，请务必填写私人 Key</p>
-        <input type="password" id="api-key-input" placeholder="粘贴您的私人 API Key...">
-        <button class="primary-btn" onclick="saveApiKey()">保存并开始</button>
-    </div>
-
     <div id="history-panel" class="glass panel">
         <h3>🕒 历史起点</h3>
         <ul id="history-list" class="list-container"></ul>
@@ -189,7 +186,7 @@
     </div>
 
     <script>
-        // 【核心】这个变量在当前预览环境下会自动注入，在你的 GitHub 网站上则为空
+        // 环境专属全局 API Key
         const apiKey = "";
         
         const colorPalette = ['#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA', '#BDE0FE', '#A2D2FF', '#FFE5D9'];
@@ -197,7 +194,7 @@
         let nodes = []; let links = []; let collectedWords = new Set();
         let nodeIdCounter = 0; let currentScale = 1;
         
-        // 【核心修复】引入 dragMoved 状态，精确区分“拖拽”与“点击”
+        // 精确区分“拖拽”与“点击”
         let isDragging = false; 
         let dragMoved = false; 
         let draggedNode = null; 
@@ -209,24 +206,20 @@
         const inputField = document.getElementById('main-input');
         const statusIndicator = document.getElementById('status-indicator');
         const overlay = document.getElementById('overlay');
+        const toastMessage = document.getElementById('toast-message');
 
-        // ================= API Key 智能管理 =================
-        document.getElementById('settings-btn').onclick = () => {
-            document.getElementById('api-key-input').value = localStorage.getItem('gemini_api_key') || '';
-            document.getElementById('settings-modal').style.display = 'block'; 
-            overlay.style.display = 'block';
-        };
-        
-        function saveApiKey() {
-            const key = document.getElementById('api-key-input').value.trim();
-            if(key) { localStorage.setItem('gemini_api_key', key); } 
-            else { localStorage.removeItem('gemini_api_key'); }
-            document.getElementById('settings-modal').style.display = 'none'; 
-            overlay.style.display = 'none'; 
-        }
-
-        function getApiKey() { 
-            return localStorage.getItem('gemini_api_key') || apiKey || ""; 
+        // ================= 全新：安全消息提示框 (彻底取代 alert) =================
+        let toastTimeout;
+        function showToast(message, duration = 3000) {
+            clearTimeout(toastTimeout);
+            toastMessage.innerText = message;
+            toastMessage.style.display = 'block';
+            setTimeout(() => toastMessage.style.opacity = '1', 10);
+            
+            toastTimeout = setTimeout(() => {
+                toastMessage.style.opacity = '0';
+                setTimeout(() => toastMessage.style.display = 'none', 300);
+            }, duration);
         }
 
         // ================= 面板与缩放 =================
@@ -245,30 +238,32 @@
             zoomContainer.style.transform = `scale(${currentScale})`;
         }
 
-        // ================= 完美拖拽逻辑 (GPT 修复版) =================
-        document.addEventListener('mousedown', (e) => {
+        // ================= 完美拖拽逻辑 (支持鼠标 & 触摸屏) =================
+        function handleDragStart(e) {
             const nodeEl = e.target.closest('.mind-node');
             if (nodeEl) {
                 isDragging = true; 
-                dragMoved = false; // 按下时初始化为未移动
+                dragMoved = false; 
                 draggedNode = nodeEl;
-                startX = e.clientX; 
-                startY = e.clientY;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                startX = clientX; 
+                startY = clientY;
                 draggedNode.dataset.initX = parseFloat(draggedNode.style.left);
                 draggedNode.dataset.initY = parseFloat(draggedNode.style.top);
                 draggedNode.classList.add('dragging');
             }
-        });
+        }
         
-        document.addEventListener('mousemove', (e) => {
+        function handleDragMove(e) {
             if (!isDragging || !draggedNode) return;
-            const dx = (e.clientX - startX) / currentScale; 
-            const dy = (e.clientY - startY) / currentScale;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const dx = (clientX - startX) / currentScale; 
+            const dy = (clientY - startY) / currentScale;
             
-            // 只要移动距离超过3像素，就标记为正在拖拽
-            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-                dragMoved = true;
-            }
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
 
             const newX = parseFloat(draggedNode.dataset.initX) + dx; 
             const newY = parseFloat(draggedNode.dataset.initY) + dy;
@@ -278,17 +273,23 @@
             const nodeObj = nodes.find(n => n.id === parseInt(draggedNode.id.split('-')[1], 10));
             if(nodeObj) { nodeObj.x = newX; nodeObj.y = newY; }
             renderLinks();
-        });
+        }
         
-        document.addEventListener('mouseup', () => {
+        function handleDragEnd() {
             if (isDragging && draggedNode) { 
                 draggedNode.classList.remove('dragging'); 
                 draggedNode = null; 
                 isDragging = false; 
-                // 延迟清理 dragMoved 状态，以便 click 事件能读取到
                 setTimeout(() => { dragMoved = false; }, 50);
             }
-        });
+        }
+
+        document.addEventListener('mousedown', handleDragStart);
+        document.addEventListener('touchstart', handleDragStart, {passive: true});
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('touchmove', handleDragMove, {passive: true});
+        document.addEventListener('mouseup', handleDragEnd);
+        document.addEventListener('touchend', handleDragEnd);
 
         // ================= 核心发散交互 =================
         inputField.addEventListener('keypress', (e) => { if (e.key === 'Enter') trigger发散(); });
@@ -296,11 +297,6 @@
 
         async function trigger发散() {
             if (inputField.value.trim() !== '') {
-                if(!getApiKey()) { 
-                    document.getElementById('settings-btn').click(); 
-                    return; 
-                }
-
                 const text = inputField.value.trim(); inputField.value = ''; 
                 document.getElementById('history-list').prepend(Object.assign(document.createElement('li'), {innerText: text}));
                 clearCanvas(); inputField.placeholder = "+ 继续输入新的起点...";
@@ -314,15 +310,13 @@
         }
 
         async function onNodeClick(nodeId, text) {
-            // 如果处于拖拽状态，直接阻断点击发散
             if (dragMoved) return; 
-
-            if(!getApiKey()) { document.getElementById('settings-btn').click(); return; }
             showLoading("思维发散中...", true);
             try {
                 const relatedWords = await callGeminiAPI(`你是一个思维发散引擎。请针对“${text}”发散出6个具象且有创意的关联词汇。返回严格JSON数组：[{"zh":"中文","en":"English"}]`, true);
                 const parentNode = nodes.find(n => n.id === nodeId);
-                const radius = 180; const angleStep = (2 * Math.PI) / relatedWords.length; let currentAngle = Math.random() * Math.PI; 
+                const radius = window.innerWidth < 768 ? 130 : 180; 
+                const angleStep = (2 * Math.PI) / relatedWords.length; let currentAngle = Math.random() * Math.PI; 
                 relatedWords.forEach((wordObj) => {
                     const childX = parentNode.x + radius * Math.cos(currentAngle); const childY = parentNode.y + radius * Math.sin(currentAngle);
                     const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
@@ -331,7 +325,7 @@
                 });
                 renderLinks(); renderNodes();
             } catch (error) { 
-                console.error(error); 
+                showToast("网络拥堵或格式错误，请稍后重试！"); 
             } finally { 
                 showLoading("", false); 
             }
@@ -365,8 +359,7 @@
 
         // ================= 一键生成文档 =================
         document.getElementById('generate-doc-btn').onclick = async () => {
-            if (collectedWords.size === 0) { alert("请先右键高亮一些灵感词汇！"); return; }
-            if (!getApiKey()) { document.getElementById('settings-btn').click(); return; }
+            if (collectedWords.size === 0) { showToast("请先右键高亮一些灵感词汇！"); return; }
             document.getElementById('collection-panel').style.display = 'none';
             showLoading("正在为您编织创意企划，请稍候...", true); overlay.style.display = 'block';
 
@@ -374,20 +367,33 @@
             try {
                 document.getElementById('doc-content').innerText = await callGeminiAPI(prompt, false);
                 document.getElementById('document-modal').style.display = 'flex';
-            } catch (err) { alert("生成失败，请刷新页面重试。"); overlay.style.display = 'none'; } finally { showLoading("", false); }
+            } catch (err) { 
+                showToast("生成失败，请刷新页面重试。"); 
+                overlay.style.display = 'none'; 
+            } finally { 
+                showLoading("", false); 
+            }
         };
 
         function closeDocumentModal() { document.getElementById('document-modal').style.display = 'none'; overlay.style.display = 'none'; }
+        
+        // 兼容 iFrame 限制的安全剪贴板复制
         function copyDocument() { 
             const text = document.getElementById('doc-content').innerText;
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => alert("✅ 已复制到剪贴板！"));
-            } else {
-                const textArea = document.createElement("textarea");
-                textArea.value = text; document.body.appendChild(textArea); textArea.select();
-                try { document.execCommand('copy'); alert("✅ 已复制到剪贴板！"); } catch (err) { alert("复制失败，请手动选中复制。"); }
-                document.body.removeChild(textArea);
+            const textArea = document.createElement("textarea");
+            textArea.value = text; 
+            textArea.style.position = "fixed";
+            textArea.style.opacity = "0";
+            document.body.appendChild(textArea); 
+            textArea.focus();
+            textArea.select();
+            try { 
+                document.execCommand('copy'); 
+                showToast("✅ 已成功复制到剪贴板！"); 
+            } catch (err) { 
+                showToast("❌ 复制失败，请手动选中并复制文本。"); 
             }
+            document.body.removeChild(textArea);
         }
 
         // ================= 渲染与逻辑 =================
@@ -411,7 +417,6 @@
                 if (!div) {
                     div = document.createElement('div'); div.id = `node-${node.id}`;
                     div.innerHTML = `<span class="node-zh">${node.zh}</span><span class="node-en">${node.en}</span>`;
-                    // 将 dragMoved 检测放进单独的方法中
                     div.addEventListener('click', (e) => onNodeClick(node.id, node.zh));
                     div.addEventListener('contextmenu', (e) => onNodeRightClick(e, node.id));
                     container.appendChild(div);
@@ -440,58 +445,46 @@
             });
         }
 
-        // ================= 智能双轨 API 引擎 =================
+        // ================= 严格符合环境规范的 API 引擎 =================
         async function callGeminiAPI(prompt, expectJson) {
-            const key = getApiKey();
-            if (!key) {
-                document.getElementById('settings-btn').click();
-                throw new Error("请先填写 API Key！");
-            }
-
-            // 根据 Key 的来源决定使用哪个模型，防止在你的网站上出现 404
-            const isCustomKey = !!localStorage.getItem('gemini_api_key');
-            let modelName = isCustomKey ? "gemini-1.5-flash" : "gemini-2.5-flash-preview-09-2025";
-            let url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
-            
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             const payload = { contents: [{ parts: [{ text: prompt }] }] };
+            const delays = [1000, 2000, 4000, 8000, 16000]; // 规范要求的指数级重试
             
-            let response = await fetch(url, {
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                // 当 API 报错 401/403 时，说明用户填的自定义 Key 已经失效，自动清除并提示
-                if (response.status === 401 || response.status === 403) {
-                    if (isCustomKey) {
-                        localStorage.removeItem('gemini_api_key');
-                        document.getElementById('settings-btn').click();
-                        alert("API Key 无效或未授权，请检查后重新填写！");
-                    } else {
-                        document.getElementById('settings-btn').click();
-                        alert("环境验证失败，请在设置中填写您自己的 API Key。");
-                    }
-                }
-                const errorData = await response.json().catch(()=>({}));
-                throw new Error(`API failed: ${response.status} ${errorData.error?.message || ''}`);
-            }
-            
-            const data = await response.json();
-            const textResp = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            
-            if (expectJson) {
-                const fence = String.fromCharCode(96, 96, 96); 
-                const cleanText = textResp.replace(new RegExp(fence + 'json', 'gi'), '').replace(new RegExp(fence, 'g'), '').trim();
+            for (let i = 0; i < delays.length; i++) {
                 try {
-                    return JSON.parse(cleanText);
-                } catch (parseError) {
-                    const match = textResp.match(/\[[\s\S]*\]/) || textResp.match(/\{[\s\S]*\}/);
-                    if (match) return JSON.parse(match[0]);
-                    throw parseError; 
+                    const response = await fetch(url, {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP Error: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    const textResp = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    
+                    if (expectJson) {
+                        const fence = String.fromCharCode(96, 96, 96); 
+                        const cleanText = textResp.replace(new RegExp(fence + 'json', 'gi'), '').replace(new RegExp(fence, 'g'), '').trim();
+                        try {
+                            return JSON.parse(cleanText);
+                        } catch (parseError) {
+                            const match = textResp.match(/\[[\s\S]*\]/) || textResp.match(/\{[\s\S]*\}/);
+                            if (match) return JSON.parse(match[0]);
+                            throw parseError; 
+                        }
+                    }
+                    return textResp;
+                } catch (err) {
+                    if (i === delays.length - 1) {
+                        throw new Error("API completely failed after multiple retries.");
+                    }
+                    await new Promise(r => setTimeout(r, delays[i]));
                 }
             }
-            return textResp;
         }
     </script>
 </body>
