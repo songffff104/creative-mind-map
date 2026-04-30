@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>创意发散器 V10 (极致视觉版)</title>
+    <title>创意发散器 V11 (病毒选题实战版)</title>
     <style>
         /* ================= 视觉与动态背景 ================= */
         :root {
@@ -68,7 +68,7 @@
             position: absolute; border-radius: 50%; display: flex; flex-direction: column;
             justify-content: center; align-items: center; transform: translate(-50%, -50%);
             cursor: grab; text-align: center; padding: 10px; word-wrap: break-word;
-            /* 核心修复：移除 transition: all，绝对禁止过渡 left/top，保证联动组队拖拽完美零延迟 */
+            /* 绝对禁止过渡 left/top，保证联动组队拖拽完美零延迟 */
             transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s; 
             animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
         }
@@ -78,19 +78,29 @@
             100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
         }
 
-        /* 普通节点：新拟态微凸起质感 */
+        /* 普通节点 (层级 1, 2, 3) */
         .mind-node.normal { 
             width: 84px; height: 84px; color: var(--text-dark);
             background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(240,245,250,0.85));
             border: 2px solid var(--node-color);
             box-shadow: 
-                6px 6px 14px rgba(166,180,200,0.3),    /* 右下底阴影 */
-                -6px -6px 14px rgba(255,255,255,0.9),  /* 左上环境光 */
-                inset 1px 1px 2px rgba(255,255,255,1), /* 左上内高光 */
-                inset -1px -1px 2px rgba(0,0,0,0.03);  /* 右下内暗角 */
+                6px 6px 14px rgba(166,180,200,0.3),
+                -6px -6px 14px rgba(255,255,255,0.9),
+                inset 1px 1px 2px rgba(255,255,255,1),
+                inset -1px -1px 2px rgba(0,0,0,0.03);
         }
 
-        /* 中心节点：深色能量核质感 */
+        /* 第 4 层：最终选题节点（适应长句子的胶囊形状） */
+        .mind-node.layer-4 {
+            width: 180px !important; height: auto !important; min-height: 80px;
+            border-radius: 16px !important; padding: 15px !important;
+            font-size: 13px !important; line-height: 1.4 !important;
+            background: linear-gradient(135deg, #ffffff, #f0f4f8);
+        }
+        .mind-node.layer-4 .node-zh { font-size: 13px !important; font-weight: 600; text-align: left;}
+        .mind-node.layer-4 .node-en { display: none; /* 最终选题不需要英文翻译占用空间 */ }
+
+        /* 中心节点 (第 0 层：行业) */
         .mind-node.central { 
             width: 114px; height: 114px; font-size: 18px; color: #fff;
             background: linear-gradient(135deg, var(--node-color), #2C3E50);
@@ -244,7 +254,6 @@
             background: rgba(255,255,255,0.6); border-radius: 16px; white-space: pre-wrap; color: var(--text-dark); text-align: left;
             border: 1px solid rgba(255,255,255,0.8); box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);
         }
-        /* 自定义滚动条 */
         #doc-content::-webkit-scrollbar { width: 8px; }
         #doc-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
         
@@ -255,20 +264,17 @@
 </head>
 <body>
 
-    <!-- 动态流光背景 -->
     <div class="ambient-bg">
         <div class="blob blob1"></div>
         <div class="blob blob2"></div>
         <div class="blob blob3"></div>
     </div>
 
-    <!-- 画布区 -->
     <div id="zoom-container">
         <svg id="canvas-svg"></svg>
         <div id="nodes-container"></div>
     </div>
 
-    <!-- UI 交互区 -->
     <div id="ui-layer">
         <div id="status-indicator" class="pointer-auto">✨ 宇宙正在进行头脑风暴...</div>
         <div id="toast-message"></div>
@@ -285,14 +291,13 @@
         <div id="bottom-toolbar" class="pointer-auto">
             <div id="input-wrapper-v3" class="glass">
                 <span style="color:#888; font-size:22px; margin-right:8px; user-select:none;">💡</span>
-                <input type="text" id="main-input" placeholder="输入灵感火花，按回车发散..." autocomplete="off">
+                <input type="text" id="main-input" placeholder="输入您的行业/产品 (如: 美甲、创业陪跑)..." autocomplete="off">
                 <button id="input-wand" class="input-icon-btn">✨</button>
             </div>
-            <div class="interaction-hint">提示: 拖拽父节点可移动整组，按住 Shift 拖拽可单移</div>
+            <div class="interaction-hint">提示: 拖拽联动 | 病毒选题4步法：行业 -> 人群 -> 场景 -> 痛点 -> 选题</div>
         </div>
     </div>
 
-    <!-- 弹窗遮罩与面板 -->
     <div id="overlay"></div>
     
     <div id="settings-modal" class="glass panel">
@@ -328,23 +333,19 @@
     </div>
 
     <script>
-        // 环境全局代理变量
         const envApiKey = typeof apiKey !== 'undefined' ? apiKey : "";
-        
-        // 莫兰迪/马卡龙高级色盘
         const colorPalette = ['#FF9A9E', '#FECFEF', '#A1C4FD', '#C2E9FB', '#D4FC79', '#96E6A1', '#E0C3FC', '#8EC5FC'];
 
+        // 【数据结构升级】增加了 layer(层级), rootIndustry(根行业), path(路径记录)
         let nodes = []; let links = []; let collectedWords = new Set();
         let nodeIdCounter = 0; let currentScale = 1;
-        
         let workingModel = null;
         
-        // 拖拽相关状态
         let isDragging = false; 
         let dragMoved = false; 
         let draggedNode = null; 
         let startX, startY;
-        let draggedGroupData = []; // 记录需要被联动拖拽的整个组的信息
+        let draggedGroupData = [];
 
         const container = document.getElementById('nodes-container');
         const zoomContainer = document.getElementById('zoom-container');
@@ -354,26 +355,22 @@
         const overlay = document.getElementById('overlay');
         const toastMessage = document.getElementById('toast-message');
 
-        // ================= 优雅消息提示框 =================
         let toastTimeout;
         function showToast(message, duration = 3000) {
             clearTimeout(toastTimeout);
             toastMessage.innerText = message;
             toastMessage.style.display = 'block';
             setTimeout(() => toastMessage.style.opacity = '1', 10);
-            
             toastTimeout = setTimeout(() => {
                 toastMessage.style.opacity = '0';
                 setTimeout(() => toastMessage.style.display = 'none', 300);
             }, duration);
         }
 
-        // ================= API Key 管理 =================
         document.getElementById('settings-btn').onclick = () => {
             document.getElementById('api-key-input').value = localStorage.getItem('gemini_api_key') || '';
             document.getElementById('settings-modal').style.display = 'block'; 
-            overlay.style.display = 'block';
-            overlay.style.opacity = '1';
+            overlay.style.display = 'block'; overlay.style.opacity = '1';
         };
         
         function saveApiKey() {
@@ -389,11 +386,8 @@
             overlay.style.display = 'none'; 
         }
 
-        function getApiKey() { 
-            return localStorage.getItem('gemini_api_key') || envApiKey || ""; 
-        }
+        function getApiKey() { return localStorage.getItem('gemini_api_key') || envApiKey || ""; }
 
-        // ================= 面板与缩放 =================
         document.getElementById('history-btn').onclick = () => {
             const p = document.getElementById('history-panel'); p.style.display = p.style.display === 'block' ? 'none' : 'block';
             document.getElementById('collection-panel').style.display = 'none';
@@ -409,37 +403,25 @@
             zoomContainer.style.transform = `scale(${currentScale})`;
         }
 
-        // ================= ★ 升级：组联动拖拽逻辑 =================
         function handleDragStart(e) {
             const nodeEl = e.target.closest('.mind-node');
             if (nodeEl) {
-                isDragging = true; 
-                dragMoved = false; 
-                draggedNode = nodeEl;
-                
+                isDragging = true; dragMoved = false; draggedNode = nodeEl;
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                startX = clientX; 
-                startY = clientY;
+                startX = clientX; startY = clientY;
 
                 const nodeId = parseInt(nodeEl.id.split('-')[1], 10);
-                
-                // 判断是否按下了 Shift 或其他控制键进行“单飞模式”
                 const isSingleMove = e.shiftKey || e.ctrlKey || e.metaKey || e.altKey;
 
-                // 递归查找当前节点的所有“后代”节点（也就是它牵挂的整棵家族树）
                 const getDescendants = (id) => {
                     let desc = [id];
                     const children = links.filter(l => l.source === id).map(l => l.target);
-                    for (let child of children) {
-                        desc = desc.concat(getDescendants(child));
-                    }
+                    for (let child of children) { desc = desc.concat(getDescendants(child)); }
                     return desc;
                 };
 
                 const groupIds = isSingleMove ? [nodeId] : getDescendants(nodeId);
-
-                // 将要移动的整组节点存起来，并记录它们抓取时的初始坐标
                 draggedGroupData = groupIds.map(id => {
                     const n = nodes.find(node => node.id === id);
                     const dom = document.getElementById(`node-${id}`);
@@ -453,33 +435,23 @@
             if (!isDragging || draggedGroupData.length === 0) return;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-            // 计算位移量
             const dx = (clientX - startX) / currentScale; 
             const dy = (clientY - startY) / currentScale;
             
             if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved = true;
 
-            // 批量将位移量应用给组内的每一个节点
             draggedGroupData.forEach(item => {
-                const newX = item.initX + dx;
-                const newY = item.initY + dy;
-                item.node.x = newX;
-                item.node.y = newY;
-                item.dom.style.left = `${newX}px`;
-                item.dom.style.top = `${newY}px`;
+                const newX = item.initX + dx; const newY = item.initY + dy;
+                item.node.x = newX; item.node.y = newY;
+                item.dom.style.left = `${newX}px`; item.dom.style.top = `${newY}px`;
             });
-            
             renderLinks();
         }
         
         function handleDragEnd() {
             if (isDragging) { 
-                // 清理所有拖动状态
                 draggedGroupData.forEach(item => item.dom.classList.remove('dragging'));
-                draggedGroupData = [];
-                draggedNode = null; 
-                isDragging = false; 
+                draggedGroupData = []; draggedNode = null; isDragging = false; 
                 setTimeout(() => { dragMoved = false; }, 50);
             }
         }
@@ -491,30 +463,22 @@
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('touchend', handleDragEnd);
 
-        // ================= 核心发散交互 =================
+        // ================= 核心发散交互 (病毒选题四层逻辑) =================
         inputField.addEventListener('keypress', (e) => { if (e.key === 'Enter') trigger发散(); });
         document.getElementById('input-wand').onclick = trigger发散;
 
         async function trigger发散() {
             if (inputField.value.trim() !== '') {
-                if(!getApiKey()) { 
-                    document.getElementById('settings-btn').click(); 
-                    return; 
-                }
+                if(!getApiKey()) { document.getElementById('settings-btn').click(); return; }
 
-                const text = inputField.value.trim(); inputField.value = ''; 
-                document.getElementById('history-list').prepend(Object.assign(document.createElement('li'), {innerText: text}));
+                const industry = inputField.value.trim(); inputField.value = ''; 
+                document.getElementById('history-list').prepend(Object.assign(document.createElement('li'), {innerText: industry}));
                 clearCanvas(); inputField.placeholder = "继续注入灵感...";
                 
                 const baseColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
-                const newNodeId = createNode(text, "...", window.innerWidth/2, window.innerHeight/2, true, baseColor, true);
+                // 根节点（第0层）：只记录行业
+                createNode(industry, "Layer 0: Industry", window.innerWidth/2, window.innerHeight/2, true, baseColor, true, 0, industry, [industry]);
                 renderNodes();
-                try {
-                    const trans = await callGeminiAPI(`Translate "${text}" to English concisely. Reply JSON: {"zh":"${text}","en":"trans"}`, true);
-                    nodes.find(n=>n.id===newNodeId).en = trans.en; renderNodes();
-                } catch (e) {
-                    console.log("翻译请求忽略: ", e);
-                }
             }
         }
 
@@ -522,32 +486,63 @@
             if (dragMoved) return; 
             if(!getApiKey()) { document.getElementById('settings-btn').click(); return; }
 
-            showLoading("✨ 宇宙脑图织造中...", true);
+            const parentNode = nodes.find(n => n.id === nodeId);
+            
+            // 第4层已经是最终选题了，不需要再点击发散
+            if (parentNode.layer >= 4) {
+                showToast("📌 这已经是最终的爆款选题啦，快右键收集它吧！");
+                return;
+            }
+
+            // 动态构建四层病毒选题 Prompt
+            let prompt = "";
+            if (parentNode.layer === 0) {
+                prompt = `你是一个资深自媒体爆款编导。当前中心词是行业/产品：【${text}】。请发散出8个最需要该产品服务的“核心目标人群标签”（如：带娃宝妈、职场新人等）。返回严格JSON数组：[{"zh":"中文人群标签","en":"Audience"}]`;
+                showLoading("🔍 正在锁定目标人群...", true);
+            } else if (parentNode.layer === 1) {
+                prompt = `行业是【${parentNode.rootIndustry}】，当前目标人群是：【${text}】。请针对该人群，发散出8个他们日常生活中最常遇到、最让人头疼的“高频具体场景或烦心事”。返回严格JSON数组：[{"zh":"中文场景描述","en":"Scenario"}]`;
+                showLoading("🎬 正在寻找高频场景...", true);
+            } else if (parentNode.layer === 2) {
+                prompt = `行业【${parentNode.rootIndustry}】，人群【${parentNode.path[1]}】，当前场景是：【${text}】。请发散出8个该场景下最强烈的“负面痛点或情绪共鸣”（例如：工资低不升职、都是领导的错等，帮他们出气）。返回严格JSON数组：[{"zh":"中文情绪痛点","en":"Pain Point"}]`;
+                showLoading("⚡ 正在提炼情绪痛点...", true);
+            } else if (parentNode.layer === 3) {
+                prompt = `你是一个爆款编导。行业：【${parentNode.rootIndustry}】，目标人群：【${parentNode.path[1]}】，场景：【${parentNode.path[2]}】，核心痛点：【${text}】。
+请将以上线索连成一线，生成8个可以直接作为短视频开头的“爆款选题文案（Hook）”。
+要求：包含情绪共鸣，并极其自然地软植入该行业/产品作为解决方案。每条字数在30字左右。
+返回严格JSON数组：[{"zh":"中文爆款选题","en":"Hook"}]`;
+                showLoading("🔥 正在生成最终爆款选题...", true);
+            }
+
             try {
-                // 修改为发散 8 个关联词
-                const relatedWords = await callGeminiAPI(`你是一个思维发散引擎。请针对“${text}”发散出8个具象且有创意的关联词汇。返回严格JSON数组：[{"zh":"中文","en":"English"}]`, true);
-                const parentNode = nodes.find(n => n.id === nodeId);
-                // 增加一点扩展半径，为 8 个节点腾出空间
-                const radius = window.innerWidth < 768 ? 150 : 200; 
+                const relatedWords = await callGeminiAPI(prompt, true);
+                
+                // 根据层级动态扩大发散半径，防止文字重叠
+                const baseRadius = window.innerWidth < 768 ? 150 : 220;
+                const radius = baseRadius + (parentNode.layer * 40); 
+                
                 const angleStep = (2 * Math.PI) / relatedWords.length; let currentAngle = Math.random() * Math.PI; 
+                
                 relatedWords.forEach((wordObj) => {
-                    const childX = parentNode.x + radius * Math.cos(currentAngle); const childY = parentNode.y + radius * Math.sin(currentAngle);
+                    const childX = parentNode.x + radius * Math.cos(currentAngle); 
+                    const childY = parentNode.y + radius * Math.sin(currentAngle);
                     const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
-                    const childId = createNode(wordObj.zh, wordObj.en, childX, childY, false, randomColor, false);
-                    createLink(nodeId, childId); currentAngle += angleStep;
+                    
+                    // 构建子节点：层级+1，继承根行业，继承并增加路径
+                    const childPath = [...parentNode.path, wordObj.zh];
+                    const childId = createNode(wordObj.zh, wordObj.en, childX, childY, false, randomColor, false, parentNode.layer + 1, parentNode.rootIndustry, childPath);
+                    
+                    createLink(nodeId, childId); 
+                    currentAngle += angleStep;
                 });
                 renderLinks(); renderNodes();
             } catch (error) { 
                 console.error(error);
-                if(error.message !== "Invalid_API_Key") {
-                    showToast("⚠️ 灵感信号微弱，请再次点击节点重试！"); 
-                }
+                if(error.message !== "Invalid_API_Key") showToast("⚠️ 灵感信号微弱，请再次点击重试！"); 
             } finally { 
                 showLoading("", false); 
             }
         }
 
-        // ================= UI 与 收集逻辑 =================
         function updateCollectionUI() {
             document.getElementById('collection-badge').innerText = collectedWords.size;
             const list = document.getElementById('collection-list');
@@ -569,12 +564,10 @@
             if (collectedWords.has(node.zh)) collectedWords.delete(node.zh); 
             else collectedWords.add(node.zh);
             
-            updateCollectionUI();
-            renderNodes();
+            updateCollectionUI(); renderNodes();
             showToast(collectedWords.has(node.zh) ? "✨ 灵感已入库" : "🗑️ 已移出收集箱", 1500);
         }
 
-        // ================= 一键生成文档 =================
         document.getElementById('generate-doc-btn').onclick = async () => {
             if (collectedWords.size === 0) { showToast("⚠️ 请先在画布上右键挑选一些发光词汇！"); return; }
             if (!getApiKey()) { document.getElementById('settings-btn').click(); return; }
@@ -587,8 +580,7 @@
                 document.getElementById('doc-content').innerText = await callGeminiAPI(prompt, false);
                 document.getElementById('document-modal').style.display = 'flex';
             } catch (err) { 
-                showToast("⚠️ 生成失败，可能是模型正在打盹，请重试。"); 
-                overlay.style.display = 'none'; 
+                showToast("⚠️ 生成失败，可能是模型正在打盹，请重试。"); overlay.style.display = 'none'; 
             } finally { 
                 showLoading("", false); 
             }
@@ -599,32 +591,24 @@
         function copyDocument() { 
             const text = document.getElementById('doc-content').innerText;
             const textArea = document.createElement("textarea");
-            textArea.value = text; 
-            textArea.style.position = "fixed";
-            textArea.style.opacity = "0";
-            document.body.appendChild(textArea); 
-            textArea.focus();
-            textArea.select();
-            try { 
-                document.execCommand('copy'); 
-                showToast("✅ 文档已精美复制，快去粘贴吧！"); 
-            } catch (err) { 
-                showToast("❌ 复制受阻，请手动全选复制。"); 
-            }
+            textArea.value = text; textArea.style.position = "fixed"; textArea.style.opacity = "0";
+            document.body.appendChild(textArea); textArea.focus(); textArea.select();
+            try { document.execCommand('copy'); showToast("✅ 文档已精美复制，快去粘贴吧！"); } 
+            catch (err) { showToast("❌ 复制受阻，请手动全选复制。"); }
             document.body.removeChild(textArea);
         }
 
-        // ================= 渲染与逻辑 =================
-        function createNode(zhText, enText, x, y, isLarge, color, isCentral) {
-            const id = nodeIdCounter++; nodes.push({ id, zh: zhText, en: enText, x, y, isLarge, color, isCentral }); return id;
+        // ================= 渲染与逻辑 (增加 layer 等属性) =================
+        function createNode(zhText, enText, x, y, isLarge, color, isCentral, layer = 0, rootIndustry = "", path = []) {
+            const id = nodeIdCounter++; 
+            nodes.push({ id, zh: zhText, en: enText, x, y, isLarge, color, isCentral, layer, rootIndustry, path }); 
+            return id;
         }
         function createLink(sourceId, targetId) { links.push({ source: sourceId, target: targetId }); }
         
         function clearCanvas() { 
-            nodes = []; links = []; 
-            collectedWords.clear(); 
-            updateCollectionUI(); 
-            container.innerHTML = ''; svgCanvas.innerHTML = ''; 
+            nodes = []; links = []; collectedWords.clear(); 
+            updateCollectionUI(); container.innerHTML = ''; svgCanvas.innerHTML = ''; 
         }
         
         function showLoading(text, show) { statusIndicator.innerText = text; statusIndicator.style.display = show ? 'block' : 'none'; }
@@ -641,13 +625,14 @@
                 }
                 
                 div.style.setProperty('--node-color', node.color);
-                div.className = `mind-node ${node.isCentral ? 'central' : 'normal'}`;
                 
-                if (collectedWords.has(node.zh)) { 
-                    div.classList.add('collected'); 
-                } else {
-                    div.classList.remove('collected');
-                }
+                // 根据 layer 应用不同样式，第4层（最终选题）用特殊胶囊样式
+                let classNames = `mind-node ${node.isCentral ? 'central' : 'normal'}`;
+                if (node.layer >= 4) classNames += ' layer-4';
+                div.className = classNames;
+                
+                if (collectedWords.has(node.zh)) { div.classList.add('collected'); } 
+                else { div.classList.remove('collected'); }
                 div.style.left = `${node.x}px`; div.style.top = `${node.y}px`;
             });
             renderLinks();
@@ -665,87 +650,50 @@
             });
         }
 
-        // ================= 智能模型探测 API 引擎 =================
         async function callGeminiAPI(prompt, expectJson) {
             const key = getApiKey();
             if (!key) throw new Error("API Key 缺失");
 
-            let modelsToTry = [];
-            
-            if (workingModel) {
-                modelsToTry = [workingModel];
-            } else {
-                modelsToTry = [
-                    "gemini-2.5-flash",
-                    "gemini-1.5-flash",
-                    "gemini-1.5-pro",
-                    "gemini-pro",
-                    "gemini-2.5-flash-preview-09-2025"
-                ];
-                showToast("🔍 正在扫描可用 AI 节点...", 4000);
-            }
+            let modelsToTry = workingModel ? [workingModel] : [
+                "gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-2.5-flash-preview-09-2025"
+            ];
             
             const payload = { contents: [{ parts: [{ text: prompt }] }] };
             let lastError = null;
             
             for (const model of modelsToTry) {
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-                
                 try {
-                    const response = await fetch(url, {
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.status === 404) {
-                        console.warn(`[探测] 模型 ${model} 不适用，切换下一个...`);
-                        continue; 
-                    }
-
+                    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (response.status === 404) continue; 
                     if (response.status === 401 || response.status === 403) {
-                        localStorage.removeItem('gemini_api_key');
-                        document.getElementById('settings-btn').click();
-                        showToast("🚫 密钥未授权或已失效，请重新配置！", 4000);
-                        throw new Error("Invalid_API_Key");
+                        localStorage.removeItem('gemini_api_key'); document.getElementById('settings-btn').click();
+                        showToast("🚫 密钥未授权或已失效，请重新配置！", 4000); throw new Error("Invalid_API_Key");
                     }
-
                     if (!response.ok) {
-                        const errorData = await response.json().catch(()=>({}));
-                        throw new Error(`HTTP ${response.status}: ${errorData.error?.message || ''}`);
+                        const errorData = await response.json().catch(()=>({})); throw new Error(`HTTP ${response.status}`);
                     }
-                    
                     if (!workingModel) {
-                        workingModel = model; 
-                        console.log(`[探测成功] 已锁定高性能节点: ${model}`);
-                        showToast(`🚀 AI 节点连接成功！`, 2000);
+                        workingModel = model; showToast(`🚀 AI 节点 (${model}) 连接成功！`, 2000);
                     }
-
                     const data = await response.json();
                     const textResp = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
                     
                     if (expectJson) {
                         const fence = String.fromCharCode(96, 96, 96); 
                         const cleanText = textResp.replace(new RegExp(fence + 'json', 'gi'), '').replace(new RegExp(fence, 'g'), '').trim();
-                        try {
-                            return JSON.parse(cleanText);
-                        } catch (parseError) {
+                        try { return JSON.parse(cleanText); } 
+                        catch (parseError) {
                             const match = textResp.match(/\[[\s\S]*\]/) || textResp.match(/\{[\s\S]*\}/);
-                            if (match) return JSON.parse(match[0]);
-                            throw parseError; 
+                            if (match) return JSON.parse(match[0]); throw parseError; 
                         }
                     }
                     return textResp;
-
                 } catch (err) {
-                    lastError = err;
-                    if (err.message === "Invalid_API_Key") break;
+                    lastError = err; if (err.message === "Invalid_API_Key") break;
                 }
             }
-            
-            if(lastError && lastError.message !== "Invalid_API_Key") {
-                throw lastError || new Error("星系链路暂不可用。");
-            }
+            if(lastError && lastError.message !== "Invalid_API_Key") throw lastError || new Error("链路暂不可用。");
             throw new Error("请求被中断");
         }
     </script>
